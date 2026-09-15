@@ -1,18 +1,18 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: {{ .Release.Name }}-deployment
+  name: {{ include "nginx-demo.deploymentName" . }}
   labels:
-    app: {{ .Release.Name }}
+    {{- include "nginx-demo.labels" . | nindent 4 }}
 spec:
   replicas: {{ .Values.replicaCount }}
   selector:
     matchLabels:
-      app: {{ .Release.Name }}
+      {{- include "nginx-demo.selectorLabels" . | nindent 6 }}
   template:
     metadata:
       labels:
-        app: {{ .Release.Name }}
+        {{- include "nginx-demo.labels" . | nindent 8 }}
     spec:
       containers:
         - name: nginx
