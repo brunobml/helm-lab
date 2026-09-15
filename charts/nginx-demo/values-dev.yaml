@@ -1,1 +1,12 @@
 replicaCount: 1
+
+extraEnv:
+  LAB_NAME: dev
+  FEATURE_ENABLED: "false"
+
+resources:
+  requests:
+    cpu: 50m
+    memory: 32Mi
+  limits:
+    memory: 128Mi

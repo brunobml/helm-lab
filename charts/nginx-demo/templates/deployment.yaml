@@ -21,3 +21,14 @@ spec:
           ports:
             # Declares the image's default port; it does not configure the server.
             - containerPort: 80
+          {{- with .Values.extraEnv }}
+          env:
+            {{- range $name, $value := . }}
+            - name: {{ $name | quote }}
+              value: {{ $value | quote }}
+            {{- end }}
+          {{- end }}
+          {{- with .Values.resources }}
+          resources:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}

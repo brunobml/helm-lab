@@ -13,3 +13,7 @@ service:
   port: 80
   # targetPort must match NGINX's listening port. This does not configure NGINX.
   targetPort: 80
+
+extraEnv: {}
+
+resources: {}
