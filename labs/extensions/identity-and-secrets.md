@@ -44,4 +44,78 @@ namespaced Role be more appropriate than a ClusterRole?
 Remove the Secret reference via upgrade before deleting `demo-learning`. Disable
 the exercise's RBAC if no longer needed. Save `extension-identity-complete`.
 
+<details>
+<summary>Hint: helper in templates/_helpers.tpl</summary>
+
+```gotemplate
+{{/*
+Service account name
+*/}}
+{{- define "nginx-demo.serviceAccountName" -}}
+{{- if .Values.serviceAccount.create -}}
+    {{- default (printf "%s-sa" .Release.Name) .Values.serviceAccount.name -}}
+{{- else -}}
+    {{- default "default" .Values.serviceAccount.name -}}
+{{- end -}}
+{{- end -}}
+```
+
+</details>
+
+<details>
+<summary>Hint: templates/serviceaccount.yaml</summary>
+
+```yaml
+{{- if .Values.serviceAccount.create -}}
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: {{ include "nginx-demo.serviceAccountName" . }}
+  labels:
+    {{- include "nginx-demo.labels" . | nindent 4 }}
+  {{- with .Values.serviceAccount.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+{{- end }}
+```
+
+</details>
+
+<details>
+<summary>Hint: templates/rbac.yaml</summary>
+
+```yaml
+{{- if .Values.rbac.create -}}
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: {{ include "nginx-demo.deploymentName" . }}
+  labels:
+    {{- include "nginx-demo.labels" . | nindent 4 }}
+rules:
+  - apiGroups: [""]
+    resources: ["configmaps"]
+    resourceNames: [{{ printf "%s-page" .Release.Name | quote }}]
+    verbs: ["get"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: {{ include "nginx-demo.deploymentName" . }}
+  labels:
+    {{- include "nginx-demo.labels" . | nindent 4 }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: {{ include "nginx-demo.deploymentName" . }}
+subjects:
+  - kind: ServiceAccount
+    name: {{ include "nginx-demo.serviceAccountName" . }}
+    namespace: {{ .Release.Namespace }}
+{{- end }}
+```
+
+</details>
+
 Reference: [Helm RBAC guidance](https://helm.sh/docs/v3/chart_best_practices/rbac/).

@@ -26,3 +26,14 @@ Resource names
 {{- define "nginx-demo.serviceName" -}}
 {{- printf "%s-service" .Release.Name | trunc 63 | trimSuffix "-" -}}
 {{- end -}}
+
+{{/*
+Service account name
+*/}}
+{{- define "nginx-demo.serviceAccountName" -}}
+{{- if .Values.serviceAccount.create -}}
+    {{- default (printf "%s-sa" .Release.Name) .Values.serviceAccount.name -}}
+{{- else -}}
+    {{- default "default" .Values.serviceAccount.name -}}
+{{- end -}}
+{{- end -}}

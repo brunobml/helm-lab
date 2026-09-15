@@ -18,10 +18,16 @@ spec:
       labels:
         {{- include "nginx-demo.labels" . | nindent 8 }}
     spec:
+      serviceAccountName: {{ include "nginx-demo.serviceAccountName" . }}
       containers:
         - name: nginx
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
           imagePullPolicy: {{ .Values.image.pullPolicy }}
+          {{- if .Values.existingSecret }}
+          envFrom:
+            - secretRef:
+                name: {{ .Values.existingSecret }}
+          {{- end }}
           ports:
             # Declares the image's default port; it does not configure the server.
             - containerPort: 80
