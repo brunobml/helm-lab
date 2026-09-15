@@ -72,6 +72,89 @@ A Deployment treats Pods as interchangeable, disposable cattle with random names
 
 ---
 
+## Break It and Recover — Detailed Walkthrough
+
+### What the challenge asks:
+> Request a nonexistent storage class, inspect the Pending PVC events, then restore the class. Understand why PVC fields cannot be changed in place.
+
+#### 1. What to Break
+Install `storage-demo` requesting a StorageClass that does not exist in the cluster:
+
+```bash
+helm install storage-broken ./charts/storage-demo -n helm-lab --set persistence.storageClass=nonexistent-sc --timeout 30s
+```
+
+#### 2. The Error Observed
+The install command times out waiting for Pod readiness:
+```text
+Error: INSTALLATION FAILED: context deadline exceeded
+```
+
+#### 3. Diagnose the Pending PVC and Pod
+Inspect the PVC and Pod status:
+```bash
+kubectl get pvc,pods -n helm-lab -l app=storage-broken
+```
+*Output:*
+```text
+NAME                                       STATUS    VOLUME   CAPACITY   ACCESS MODES   STORAGECLASS     AGE
+persistentvolumeclaim/storage-broken-data   Pending                                      nonexistent-sc   45s
+
+NAME                                          READY   STATUS    RESTARTS   AGE
+pod/storage-broken-deployment-7bb9cf9475-x2n4p 0/1     Pending   0          45s
+```
+
+Inspect the PVC events:
+```bash
+kubectl describe pvc storage-broken-data -n helm-lab
+```
+*Events log:*
+```text
+Warning  ProvisioningFailed  15s (x3 over 45s)  persistentvolume-controller
+storageclass.storage.k8s.io "nonexistent-sc" not found
+```
+
+Inspect the Pod events:
+```bash
+kubectl describe pod -l app=storage-broken -n helm-lab
+```
+*Events log:*
+```text
+Warning  FailedScheduling  10s (x2 over 40s)  default-scheduler
+0/1 nodes are available: 1 pod has unbound immediate PersistentVolumeClaims.
+```
+
+#### 4. The Immutability Rule (Why `helm upgrade` Fails Here)
+If you try to simply run `helm upgrade storage-broken ... --set persistence.storageClass=local-path`, the Kubernetes API server will reject the change:
+```text
+Error: UPGRADE FAILED: cannot patch "storage-broken-data" with kind PersistentVolumeClaim:
+PersistentVolumeClaim "storage-broken-data" is invalid: spec: Forbidden: is immutable after creation
+```
+Unlike Deployments or Services, **most fields on a Kubernetes PersistentVolumeClaim (including `storageClassName` and `accessModes`) are strictly immutable**.
+
+#### 5. How to Recover
+Because the claim cannot be patched in place, you must uninstall the broken release and reinstall it with a valid StorageClass (e.g., `local-path` in k3s/k3d):
+
+```bash
+helm uninstall storage-broken -n helm-lab
+helm install storage-demo ./charts/storage-demo -n helm-lab --wait --timeout 120s
+```
+
+Verify that the PVC is `Bound` and the Pod is `Running`:
+```bash
+kubectl get pvc,pods -n helm-lab
+```
+*Output:*
+```text
+NAME                                     STATUS   VOLUME                                     CAPACITY   ACCESS MODES   STORAGECLASS   AGE
+persistentvolumeclaim/storage-demo-data   Bound    pvc-87df43e9-86f2-491a-b328-98e6a12b4899   10Mi       RWO            local-path     15s
+
+NAME                                        READY   STATUS    RESTARTS   AGE
+pod/storage-demo-deployment-7bb9cf9475-x2n4p 1/1     Running   0          12s
+```
+
+---
+
 ## Key Takeaways
 
 | Workload Type | When to Use | Storage Pattern |

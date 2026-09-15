@@ -46,6 +46,66 @@ Below are in-depth explanations and answers for the questions posed in the **Exp
 
 ---
 
+## Break It and Recover — Detailed Walkthrough
+
+### What the challenge asks:
+> Use the wrong ingress class (e.g. `--set ingress.className=nonexistent`), observe that rendering and applying still succeed but traffic is not routed by the intended controller, then restore the correct class.
+
+#### 1. What to Break
+Run `helm upgrade` setting the Ingress class to an arbitrary nonexistent name:
+
+```bash
+helm upgrade demo-dev ./charts/nginx-demo -n helm-lab --set ingress.className=nonexistent --wait --timeout 120s
+```
+
+#### 2. Observe the Ingress Resource
+Check the Ingress object in Kubernetes:
+```bash
+kubectl get ingress -n helm-lab
+```
+*Output:*
+```text
+NAME               CLASS         HOSTS                 ADDRESS   PORTS   AGE
+demo-dev-ingress   nonexistent   chart-example.local             80      30s
+```
+Notice:
+- `helm upgrade` completed with exit code 0.
+- Kubernetes successfully created the `Ingress` object.
+- However, the `ADDRESS` column remains **completely blank**!
+
+#### 3. Test Ingress Traffic Routing
+Attempt to send traffic to Traefik using the virtual host:
+```bash
+kubectl run curl-test --image=curlimages/curl:8.5.0 --rm -i --restart=Never -- -s -H "Host: chart-example.local" http://traefik.kube-system.svc.cluster.local/
+```
+*Output:*
+```text
+404 page not found
+```
+
+#### 4. Why This Failed
+- In modern Kubernetes (`networking.k8s.io/v1`), Ingress controllers only process Ingress objects whose `spec.ingressClassName` matches their registered class name (e.g. `traefik` in k3s/k3d, or `nginx` in `ingress-nginx`).
+- Because `className` was `nonexistent`, Traefik ignored the resource completely.
+- The Ingress object sat dormant in etcd, unmanaged by any controller.
+
+#### 5. How to Recover
+Restore the valid Ingress class (e.g. `traefik` for k3s/k3d):
+
+```bash
+helm upgrade demo-dev ./charts/nginx-demo -n helm-lab --set ingress.className=traefik --wait --timeout 120s
+```
+
+Verify that the Ingress acquires an address and routes HTTP traffic:
+```bash
+kubectl run curl-test --image=curlimages/curl:8.5.0 --rm -i --restart=Never -- -s -H "Host: chart-example.local" http://traefik.kube-system.svc.cluster.local/
+```
+*Output:*
+```html
+<h1>Hello from Helm Lab</h1>
+```
+
+---
+
 ## Key Takeaways
 
 | Component | Responsibility |

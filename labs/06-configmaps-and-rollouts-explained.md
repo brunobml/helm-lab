@@ -80,6 +80,105 @@ In YAML, multiline strings under literal block scalars (`|`) rely on **uniform l
 
 ---
 
+## Break It and Recover — Detailed Walkthrough
+
+### What the challenge asks:
+> Move the checksum to the Deployment's top-level `metadata.annotations` and upgrade once. Record the Pod name. Change HTML again and upgrade. The checksum changes but this change alone does not trigger new Pods. Restore the checksum under Pod-template metadata and verify replacement.
+
+#### 1. What to Break
+In `charts/nginx-demo/templates/deployment.yaml`, move the `checksum/config` annotation from `spec.template.metadata.annotations` up to the root `metadata.annotations`:
+
+```yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "nginx-demo.deploymentName" . }}
+  labels:
+    {{- include "nginx-demo.labels" . | nindent 4 }}
+  annotations:
+    checksum/config: {{ include (print $.Template.BasePath "/configmap.yaml") . | sha256sum }}
+spec:
+  replicas: {{ .Values.replicaCount }}
+  selector:
+    matchLabels:
+      {{- include "nginx-demo.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      # checksum/config REMOVED from here!
+      labels:
+        {{- include "nginx-demo.labels" . | nindent 8 }}
+```
+
+#### 2. Apply and Record Current Pod
+Apply this change:
+```bash
+helm upgrade demo-dev ./charts/nginx-demo -n helm-lab --reset-values -f ./charts/nginx-demo/values-dev.yaml --wait --timeout 120s
+```
+
+Check the active Pod name and creation age:
+```bash
+kubectl get pods -n helm-lab -l app=demo-dev
+```
+*Output:*
+```text
+NAME                                   READY   STATUS    RESTARTS   AGE
+demo-dev-deployment-7bb9cf9475-abc12   1/1     Running   0          45s
+```
+*(Record the Pod name: `demo-dev-deployment-7bb9cf9475-abc12`)*
+
+#### 3. Update the HTML and Upgrade Again
+Now modify `pageContent` to change the ConfigMap's checksum:
+```bash
+helm upgrade demo-dev ./charts/nginx-demo -n helm-lab --set pageContent="<h1>Rollout Test</h1>" --wait --timeout 120s
+```
+
+Now check the Pods again:
+```bash
+kubectl get pods -n helm-lab -l app=demo-dev
+```
+*Output:*
+```text
+NAME                                   READY   STATUS    RESTARTS   AGE
+demo-dev-deployment-7bb9cf9475-abc12   1/1     Running   0          2m15s
+```
+**Notice:** The Pod was **NOT** replaced! The Pod name is identical and its age continued counting up.
+
+#### 4. Why This Failed
+- The Kubernetes Deployment controller inspects `spec.template` to decide whether a new ReplicaSet is required.
+- Annotations placed in root `metadata.annotations` only update metadata on the Deployment object itself in etcd.
+- Because `spec.template` remained bit-for-bit identical, the controller concluded that no Pod rollout was necessary, leaving the old Pod running.
+
+#### 5. How to Recover
+Move `checksum/config` back into `spec.template.metadata.annotations`:
+
+```yaml
+spec:
+  template:
+    metadata:
+      annotations:
+        checksum/config: {{ include (print $.Template.BasePath "/configmap.yaml") . | sha256sum }}
+      labels:
+        {{- include "nginx-demo.labels" . | nindent 8 }}
+```
+
+Re-run the upgrade:
+```bash
+helm upgrade demo-dev ./charts/nginx-demo -n helm-lab --reset-values -f ./charts/nginx-demo/values-dev.yaml --wait --timeout 120s
+```
+
+Verify that a brand-new Pod was scheduled:
+```bash
+kubectl get pods -n helm-lab -l app=demo-dev
+```
+*Output:*
+```text
+NAME                                   READY   STATUS    RESTARTS   AGE
+demo-dev-deployment-85df649f88-xyz99   1/1     Running   0          5s
+```
+A new Pod with a new ReplicaSet hash has been created and is serving traffic.
+
+---
+
 ## Key Takeaways
 
 | Technique | Purpose |

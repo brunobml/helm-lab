@@ -85,6 +85,84 @@ Linting only analyzes static text files on your local machine. An HTTP test hook
 
 ---
 
+## Break It and Recover — Detailed Walkthrough
+
+### What the challenge asks:
+> Temporarily change the test's URL to a nonexistent Service. Upgrade and run the test; expect failure. Inspect the retained test Pod with `kubectl logs`, correct the URL, upgrade, and rerun.
+
+#### 1. What to Break
+In `charts/nginx-demo/templates/tests/http.yaml`, point the `wget` test command to a nonexistent service host:
+
+```yaml
+  containers:
+    - name: http
+      image: "nginx:1.30.4-alpine"
+      command: ["wget"]
+      args:
+        - "-qO-"
+        - "--timeout=10"
+        - "http://nonexistent-service:80/"
+```
+
+#### 2. Upgrade and Run the Test Hook
+Apply the updated chart and trigger the test suite:
+```bash
+helm upgrade demo-dev ./charts/nginx-demo -n helm-lab --reset-values -f ./charts/nginx-demo/values-dev.yaml --wait --timeout 120s
+helm test demo-dev -n helm-lab --logs
+```
+
+#### 3. The Error Observed
+Helm test aborts and outputs the container log:
+```text
+RUNNING: demo-dev-http-test
+[demo-dev-http-test] wget: bad address 'nonexistent-service'
+ERROR:   demo-dev-http-test: pod failed with status "Failed"
+Error: 1 test(s) failed
+```
+
+#### 4. Diagnostic Inspection
+Check the retained test Pod in the cluster:
+```bash
+kubectl get pods -n helm-lab -l helm.sh/hook=test
+```
+*Output:*
+```text
+NAME                 READY   STATUS   RESTARTS   AGE
+demo-dev-http-test   0/1     Error    0          20s
+```
+
+Check the main application release status:
+```bash
+helm status demo-dev -n helm-lab
+kubectl get pods -n helm-lab -l app=demo-dev
+```
+Notice that the main Deployment and NGINX Pods are **still running and healthy**!
+- **Key Lesson:** A failing `helm test` does **not** automatically roll back the release or terminate existing application Pods. It is an assertion probe designed for CI/CD pipelines to detect failure and decide whether to initiate `helm rollback`.
+
+#### 5. How to Recover
+Restore the valid service name helper in `charts/nginx-demo/templates/tests/http.yaml`:
+
+```yaml
+      args:
+        - "-qO-"
+        - "--timeout=10"
+        - "http://{{ include \"nginx-demo.serviceName\" . }}:{{ .Values.service.port }}/"
+```
+
+Upgrade the chart and rerun the test:
+```bash
+helm upgrade demo-dev ./charts/nginx-demo -n helm-lab --reset-values -f ./charts/nginx-demo/values-dev.yaml --wait --timeout 120s
+helm test demo-dev -n helm-lab --logs
+```
+
+*Output:*
+```text
+RUNNING: demo-dev-http-test
+PASSED:  demo-dev-http-test
+```
+
+---
+
 ## Key Takeaways
 
 | Validation Layer | When It Runs | What It Verifies |

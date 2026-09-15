@@ -81,6 +81,69 @@ The Service finds Pods using **label selectors** (`spec.selector`), which match 
 
 ---
 
+## Break It and Recover — Detailed Walkthrough
+
+### What the challenge asks:
+> Temporarily misspell `.Values.replicaCount` in the Deployment template. Run `helm template` and inspect `replicas`: a missing value may render empty instead of producing an obvious template error. Restore the key and render again.
+
+#### 1. What to Break
+In `charts/nginx-demo/templates/deployment.yaml`, introduce a typo in the replica count key (e.g., changing `replicaCount` to `replicasCount`):
+
+```yaml
+spec:
+  replicas: {{ .Values.replicasCount }}
+```
+
+#### 2. Run the Command
+```bash
+helm template demo-dev ./charts/nginx-demo
+```
+
+#### 3. The Result Observed
+Look closely at the rendered `Deployment` output:
+```yaml
+# Source: nginx-demo/templates/deployment.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: demo-dev-deployment
+  labels:
+    app: demo-dev
+spec:
+  replicas: 
+  selector:
+    matchLabels:
+      app: demo-dev
+```
+Notice that `replicas:` is completely empty! Helm did **not** throw an error during rendering.
+
+#### 4. Why This Failed (The Silent Nil Trap)
+- In Go templates, accessing a non-existent key on a map (like `.Values.replicasCount`) does not raise an exception or abort by default; it evaluates to `nil`, which renders as an empty string `""`.
+- In YAML, `replicas:` with nothing following it evaluates to `null`.
+- If you were to apply this manifest to Kubernetes, the API server would reject it with a schema violation:
+  ```text
+  error: error validating "": error validating data: ValidationError(Deployment.spec.replicas): invalid type: got "null", expected "integer"
+  ```
+- **Why this matters:** Silent template omissions are dangerous. This is why production charts use the `required` function (e.g., `{{ required "replicaCount is required" .Values.replicaCount }}`) or JSON Schema validation (`values.schema.json`, covered in Lab 7).
+
+#### 5. How to Recover
+Restore the correct key name in `charts/nginx-demo/templates/deployment.yaml`:
+```yaml
+spec:
+  replicas: {{ .Values.replicaCount }}
+```
+
+Verify that the template renders a valid integer:
+```bash
+helm template demo-dev ./charts/nginx-demo | grep "replicas:"
+```
+*Output:*
+```yaml
+  replicas: 2
+```
+
+---
+
 ## Key Takeaways
 
 | Concept | Explanation |

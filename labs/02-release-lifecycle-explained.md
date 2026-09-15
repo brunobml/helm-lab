@@ -91,6 +91,92 @@ A Helm release goes through several distinct phases:
 
 ---
 
+## Break It and Recover — Detailed Walkthrough
+
+### What the challenge asks:
+> Try an unavailable image tag with `--set-string image.tag=does-not-exist-helm-lab --wait --timeout 60s`. Expect the upgrade to time out and a new Pod to report an image-pull error. Recover by rolling back to the last successful revision.
+
+#### 1. What to Break
+Run `helm upgrade` pointing to an image tag that does not exist in the registry, using `--wait` and a 60-second timeout:
+
+```bash
+helm upgrade demo-dev ./charts/nginx-demo -n helm-lab --set-string image.tag=does-not-exist-helm-lab --wait --timeout 60s
+```
+
+#### 2. The Error Observed
+After waiting 60 seconds, Helm aborts and returns:
+```text
+Error: UPGRADE FAILED: context deadline exceeded
+```
+
+#### 3. Diagnose the Pod Failure
+Check the cluster Pods:
+```bash
+kubectl get pods -n helm-lab
+```
+*Output:*
+```text
+NAME                                   READY   STATUS             RESTARTS   AGE
+demo-dev-deployment-7bb9cf9475-x2n4p   1/1     Running            0          10m
+demo-dev-deployment-7bb9cf9475-z89wq   1/1     Running            0          10m
+demo-dev-deployment-556b69b9b5-4q8lp   0/1     ImagePullBackOff   0          65s
+```
+
+Inspect the pod events:
+```bash
+kubectl describe pods -n helm-lab -l app=demo-dev
+```
+*Events log:*
+```text
+Warning  Failed     30s (x2 over 45s)   kubelet  Failed to pull image "nginx:does-not-exist-helm-lab": rpc error: code = NotFound
+Warning  Failed     30s (x2 over 45s)   kubelet  Error: ErrImagePull
+```
+
+Check the Helm release history:
+```bash
+helm history demo-dev -n helm-lab
+```
+*Output:*
+```text
+REVISION    UPDATED                     STATUS    CHART               APP VERSION    DESCRIPTION
+1           ...                         superseded nginx-demo-0.1.0   1.30.4         Install complete
+2           ...                         failed     nginx-demo-0.1.0   1.30.4         Upgrade "demo-dev" failed: context deadline exceeded
+```
+Notice that:
+- Revision 2 is marked `failed`.
+- Kubernetes rolling update paused: the old healthy Pods from Revision 1 were kept alive and serving traffic because the new Pod never became `Ready`!
+
+#### 4. How to Recover
+Roll back to the last known healthy revision (Revision 1):
+```bash
+helm rollback demo-dev 1 -n helm-lab --wait --timeout 60s
+```
+*Output:*
+```text
+Rollback was a success! Happy Helming!
+```
+
+#### 5. Verify Clean State
+Inspect the release history and Pod status:
+```bash
+helm history demo-dev -n helm-lab
+kubectl get pods -n helm-lab
+```
+*Output:*
+```text
+REVISION    UPDATED     STATUS      CHART               APP VERSION    DESCRIPTION
+1           ...         superseded  nginx-demo-0.1.0   1.30.4         Install complete
+2           ...         failed      nginx-demo-0.1.0   1.30.4         Upgrade "demo-dev" failed
+3           ...         deployed    nginx-demo-0.1.0   1.30.4         Rollback to 1
+
+NAME                                   READY   STATUS    RESTARTS   AGE
+demo-dev-deployment-7bb9cf9475-x2n4p   1/1     Running   0          12m
+demo-dev-deployment-7bb9cf9475-z89wq   1/1     Running   0          12m
+```
+Helm created Revision 3 (a rollback to Revision 1), terminating the broken Pod and returning the Deployment to a healthy state.
+
+---
+
 ## Key Takeaways
 
 | Concept | Explanation |

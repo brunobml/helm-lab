@@ -69,6 +69,52 @@ An explicit, immutable SemVer version (e.g. `0.2.0`) guarantees **idempotence, a
 
 ---
 
+## Break It and Recover — Detailed Walkthrough
+
+### What the challenge asks:
+> Edit `pageContent` in the working chart and render the folder and archive separately. The archive must retain the packaged content. Restore the experimental edit; package a new chart version when you want a new artifact.
+
+#### 1. What to Break
+After running `helm package ./charts/nginx-demo --destination ./dist`, edit `pageContent` inside the working directory (`charts/nginx-demo/values.yaml`):
+
+```yaml
+pageContent: "<h1>Unpackaged Experimental Content</h1>"
+```
+
+#### 2. Render Both the Directory and the Packaged Archive
+Render the local working directory:
+```bash
+helm template test-dir ./charts/nginx-demo | grep -A 2 "index.html:"
+```
+*Output:*
+```yaml
+  index.html: |
+    <h1>Unpackaged Experimental Content</h1>
+```
+
+Now render the packaged archive in `./dist`:
+```bash
+helm template test-pkg ./dist/nginx-demo-0.2.0.tgz | grep -A 2 "index.html:"
+```
+*Output:*
+```yaml
+  index.html: |
+    <h1>Hello from Helm Lab</h1>
+```
+
+#### 3. Why This Happened (Artifact Immutability)
+- A `.tgz` chart archive is an **immutable, compressed snapshot** of the chart files taken at the moment `helm package` was executed.
+- Modifying files in your working directory has zero effect on already-packaged archives or artifacts published to OCI registries.
+- **The Golden Rule of Packaging:** Never modify and republish a chart under the same version number. If you change templates or values, bump `version` in `Chart.yaml` (e.g. `0.2.1`) and produce a brand-new artifact.
+
+#### 4. How to Recover
+Restore the original `pageContent` in `charts/nginx-demo/values.yaml`:
+```yaml
+pageContent: "<h1>Hello from Helm Lab</h1>"
+```
+
+---
+
 ## Key Takeaways
 
 | Concept | Explanation |

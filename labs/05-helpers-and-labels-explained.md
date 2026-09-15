@@ -94,6 +94,78 @@ Kubernetes resources are identified by their **`metadata.name`**. If you change 
 
 ---
 
+## Break It and Recover — Detailed Walkthrough
+
+### What the challenge asks:
+> Temporarily put the version label in the selector helper and render. Compare with the installed Deployment's selector; do not apply it. Deployment selectors are immutable, and changing versions should not change which Pods are selected. Remove the version from selectors before continuing.
+
+#### 1. What to Break
+In `charts/nginx-demo/templates/_helpers.tpl`, temporarily add the application version to the selector helper:
+
+```gotemplate
+{{- define "nginx-demo.selectorLabels" -}}
+app: {{ .Release.Name }}
+app.kubernetes.io/version: {{ .Chart.AppVersion | quote }}
+{{- end }}
+```
+
+#### 2. Render and Compare
+Render the updated templates:
+```bash
+helm template demo-dev ./charts/nginx-demo -f ./charts/nginx-demo/values-dev.yaml
+```
+
+Notice the rendered Deployment selector:
+```yaml
+spec:
+  selector:
+    matchLabels:
+      app: demo-dev
+      app.kubernetes.io/version: "1.30.4"
+```
+
+Now inspect the selector currently running on the live Kubernetes cluster:
+```bash
+kubectl get deployment demo-dev-deployment -n helm-lab -o jsonpath='{.spec.selector.matchLabels}'
+```
+*Live cluster output:*
+```json
+{"app":"demo-dev"}
+```
+
+#### 3. What Would Happen If Applied (The Immutability Violation)
+If you attempted to run `helm upgrade demo-dev ...`, the Kubernetes API server would reject the request with an unrecoverable error:
+```text
+Error: UPGRADE FAILED: cannot patch "demo-dev-deployment" with kind Deployment:
+Deployment.apps "demo-dev-deployment" is invalid: spec.selector: Invalid value:
+map[string]string{"app":"demo-dev", "app.kubernetes.io/version":"1.30.4"}: field is immutable
+```
+
+#### 4. Why This Failed
+- Kubernetes controllers (`Deployment`, `StatefulSet`, `DaemonSet`) require immutable selectors (`spec.selector.matchLabels`). Once created, Kubernetes will never allow you to add, remove, or modify selector keys.
+- If selectors were mutable and changed with every version bump, the Deployment controller would instantly orphan its existing Pods during an upgrade, losing track of what is running and failing to perform a zero-downtime rolling update.
+
+#### 5. How to Recover
+Remove `app.kubernetes.io/version` from `nginx-demo.selectorLabels` in `charts/nginx-demo/templates/_helpers.tpl`, keeping it strictly inside `nginx-demo.labels`:
+
+```gotemplate
+{{- define "nginx-demo.selectorLabels" -}}
+app: {{ .Release.Name }}
+{{- end }}
+```
+
+Verify that the selector matches the cluster state:
+```bash
+helm template demo-dev ./charts/nginx-demo -f ./charts/nginx-demo/values-dev.yaml | grep -A 3 "matchLabels:"
+```
+*Output:*
+```yaml
+    matchLabels:
+      app: demo-dev
+```
+
+---
+
 ## Key Takeaways
 
 | Principle | Implementation |

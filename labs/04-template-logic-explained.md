@@ -114,6 +114,141 @@ The leading dash `{{-` strips all **preceding whitespace and newlines** immediat
 
 ---
 
+## Break It and Recover — Detailed Walkthrough
+
+The "Break it and recover" exercises simulate the most common real-world template bugs in Helm: context scoping errors and YAML whitespace indentation errors.
+
+---
+
+### Challenge 1: Scoping Loss Inside `range` (`.Release.Name` vs `$.Release.Name`)
+
+#### 1. What to Break
+In `charts/nginx-demo/templates/deployment.yaml`, temporarily edit the `extraEnv` loop to reference `.Release.Name` inside the `range` block:
+
+```yaml
+          {{- with .Values.extraEnv }}
+          env:
+            {{- range $name, $value := . }}
+            - name: {{ $name | quote }}
+              value: {{ .Release.Name | quote }}
+            {{- end }}
+          {{- end }}
+```
+
+#### 2. Run the Command
+Attempt to render the chart using the dev values:
+```bash
+helm template demo-dev ./charts/nginx-demo -f ./charts/nginx-demo/values-dev.yaml
+```
+
+#### 3. The Error Observed
+```text
+Error: template: nginx-demo/templates/deployment.yaml:26:32: executing "nginx-demo/templates/deployment.yaml" at <.Release.Name>: can't evaluate field Release in type interface {}
+```
+
+#### 4. Why This Failed
+- Go templates use the dot `.` as a dynamic cursor representing the **current local scope**.
+- Before `with`, `.` is the root context containing `Release`, `Values`, `Chart`, etc.
+- Inside `{{- with .Values.extraEnv }}`, `.` shifts to the `extraEnv` map.
+- Inside `{{- range $name, $value := . }}`, the dot `.` is re-scoped to the current iteration's value (a primitive string like `"dev"` or `"false"`).
+- Evaluating `.Release.Name` fails because a string has no field or method named `Release`.
+
+#### 5. How to Recover
+In Go templates, the dollar sign `$` is reserved to always point to the **global root context**, no matter how deeply nested your loops or conditionals are.
+
+Change `.Release.Name` to `$.Release.Name`:
+```yaml
+          {{- with .Values.extraEnv }}
+          env:
+            {{- range $name, $value := . }}
+            - name: {{ $name | quote }}
+              value: {{ $.Release.Name | quote }}
+            {{- end }}
+          {{- end }}
+```
+
+Re-run:
+```bash
+helm template demo-dev ./charts/nginx-demo -f ./charts/nginx-demo/values-dev.yaml
+```
+
+*Rendered output:*
+```yaml
+          env:
+            - name: "FEATURE_ENABLED"
+              value: "demo-dev"
+            - name: "LAB_NAME"
+              value: "demo-dev"
+```
+
+#### 6. Restore Clean State
+Restore the intended output using the loop variable `$value`:
+```yaml
+          {{- with .Values.extraEnv }}
+          env:
+            {{- range $name, $value := . }}
+            - name: {{ $name | quote }}
+              value: {{ $value | quote }}
+            {{- end }}
+          {{- end }}
+```
+
+---
+
+### Challenge 2: Indentation Corruption (`nindent` and YAML Nesting)
+
+#### 1. What to Break
+In `charts/nginx-demo/templates/deployment.yaml`, intentionally set the wrong indentation level for `resources` by changing `nindent 12` to `nindent 8`:
+
+```yaml
+          {{- with .Values.resources }}
+          resources:
+            {{- toYaml . | nindent 8 }}
+          {{- end }}
+```
+
+#### 2. Run the Command
+```bash
+helm template demo-dev ./charts/nginx-demo -f ./charts/nginx-demo/values-dev.yaml
+```
+
+#### 3. The Error Observed
+```text
+Error: YAML parse error on nginx-demo/templates/deployment.yaml: error converting YAML to JSON: yaml: line 28: mapping values are not allowed in this context
+```
+
+#### 4. Why This Failed
+- Go templates perform raw string substitution before any YAML parsing occurs. Helm does not "know" what valid Kubernetes YAML looks like until the template finishes rendering.
+- In `deployment.yaml`, the container item `- name: nginx` is indented with 8 spaces, and its attributes (`image:`, `ports:`, `resources:`) are indented with 10 spaces.
+- With `nindent 8`, the nested contents (`requests:`, `limits:`) are placed at 8 spaces—the same level as the container list item!
+- As a result, `requests:` is parsed as a sibling key to `- name: nginx` instead of a child of `resources:`, generating invalid YAML.
+
+#### 5. How to Recover
+Calculate the required indentation:
+- `spec:` (7 spaces or column 0)
+- `  template:` (2 spaces)
+- `    spec:` (4 spaces)
+- `      containers:` (6 spaces)
+- `        - name: nginx` (8 spaces)
+- `          resources:` (10 spaces)
+- `            requests:` (12 spaces) -> **requires `nindent 12`**
+
+Restore `nindent 12` in `templates/deployment.yaml`:
+```yaml
+          {{- with .Values.resources }}
+          resources:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+```
+
+Verify with:
+```bash
+helm lint ./charts/nginx-demo
+helm template demo-dev ./charts/nginx-demo -f ./charts/nginx-demo/values-dev.yaml
+```
+
+---
+
 ## Key Takeaways
 
 | Directive | Rule |

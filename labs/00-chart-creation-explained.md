@@ -78,6 +78,54 @@ Below are in-depth explanations and answers for the questions posed in the **Exp
 
 ---
 
+## Break It and Recover — Detailed Walkthrough
+
+### What the challenge asks:
+> In `Chart.yaml`, temporarily change `version: 0.1.0` to an invalid SemVer value: `version: 1`. Run `helm lint ./charts/nginx-demo` and observe the error. Restore `version: 0.1.0` and verify that `helm lint` passes again.
+
+#### 1. What to Break
+Open `charts/nginx-demo/Chart.yaml` and edit the chart version to an invalid non-SemVer integer:
+```yaml
+version: 1
+```
+
+#### 2. Run the Command
+```bash
+helm lint ./charts/nginx-demo
+```
+
+#### 3. The Error Observed
+```text
+==> Linting ./charts/nginx-demo
+[ERROR] Chart.yaml: version "1" is not a valid SemVer
+
+Error: 1 chart(s) linted, 1 chart(s) failed
+```
+
+#### 4. Why This Failed
+- Helm strictly mandates that chart `version` adhere to the **Semantic Versioning 2.0.0** specification (`MAJOR.MINOR.PATCH`).
+- Helm's package manager mechanisms (such as dependency version ranges like `^1.0.0` or `~0.1.0`, repository index generation, and OCI registry tags) depend on SemVer comparison logic.
+- A single integer `1` lacks the minor and patch segments (`1.0.0`), triggering an immediate linter failure.
+
+#### 5. How to Recover
+Restore the valid Semantic Version in `charts/nginx-demo/Chart.yaml`:
+```yaml
+version: 0.1.0
+```
+
+Verify that the chart passes linting:
+```bash
+helm lint ./charts/nginx-demo
+```
+*Output:*
+```text
+==> Linting ./charts/nginx-demo
+
+1 chart(s) linted, 0 chart(s) failed
+```
+
+---
+
 ## Key Takeaways
 
 | Concept | Golden Rule |

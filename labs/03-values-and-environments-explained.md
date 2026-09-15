@@ -92,6 +92,72 @@ While multiple releases can coexist in the same namespace by naming conventions,
 
 ---
 
+## Break It and Recover — Detailed Walkthrough
+
+### What the challenge asks:
+> Render with `--set service.port=8080`, then with `--set service.port=8080 --set service.targetPort=8080`. Compare the output. Explain why the first can route to NGINX on 80 and the second cannot. Keep targetPort at 80.
+
+#### 1. The Experiment: Case A (`service.port=8080`)
+Run:
+```bash
+helm template demo-dev ./charts/nginx-demo --set service.port=8080 | grep -A 5 "ports:"
+```
+
+*Rendered Service output:*
+```yaml
+  ports:
+    - port: 8080
+      targetPort: 80
+      protocol: TCP
+```
+
+**Why this works:**
+- `port: 8080` is the front-door listening port exposed by the Kubernetes Service within the cluster.
+- `targetPort: 80` is the backend destination port on the Pod.
+- Because NGINX inside the container is listening on port 80, the Service successfully forwards incoming requests from `demo-dev-service:8080` to the container on port 80.
+
+---
+
+#### 2. The Experiment: Case B (`service.port=8080 --set service.targetPort=8080`)
+Run:
+```bash
+helm template demo-dev ./charts/nginx-demo --set service.port=8080 --set service.targetPort=8080 | grep -A 5 "ports:"
+```
+
+*Rendered Service output:*
+```yaml
+  ports:
+    - port: 8080
+      targetPort: 8080
+      protocol: TCP
+```
+
+**Why this breaks traffic routing:**
+- The Service now sends traffic to Pod port 8080.
+- However, **nothing is listening on port 8080 inside the container**. Helm values configure Kubernetes resources; they do **not** reconfigure the third-party NGINX binary inside the container image!
+- If this configuration were applied to the cluster, any HTTP request hitting the Service would fail immediately with `Connection refused`:
+  ```text
+  curl: (7) Failed to connect to demo-dev-service port 8080: Connection refused
+  ```
+
+---
+
+#### 3. How to Recover
+Ensure `service.targetPort` remains aligned with the application container's actual listening port (`80`):
+
+```bash
+helm template demo-dev ./charts/nginx-demo -f ./charts/nginx-demo/values-dev.yaml | grep -A 5 "ports:"
+```
+*Output:*
+```yaml
+  ports:
+    - port: 80
+      targetPort: 80
+      protocol: TCP
+```
+
+---
+
 ## Key Takeaways
 
 | Concept | Explanation |

@@ -56,6 +56,68 @@ HPA calculates CPU utilization as a percentage of the container's **requested CP
 
 ---
 
+## Break It and Recover — Detailed Walkthrough
+
+### What the challenge asks:
+> Set the readiness probe path to a missing page. Observe a running but unready Pod and unavailable Service endpoints. Restore `/` and verify readiness.
+
+#### 1. What to Break
+Run `helm upgrade` setting the readiness probe to a nonexistent path like `/missing.html`:
+
+```bash
+helm upgrade demo-dev ./charts/nginx-demo -n helm-lab --set readinessProbe.httpGet.path=/missing.html --wait=false
+```
+*(We pass `--wait=false` because otherwise Helm will wait and time out waiting for the unready Pod).*
+
+#### 2. Observe the Unready Pod
+Inspect the Pod status:
+```bash
+kubectl get pods -n helm-lab -l app=demo-dev
+```
+*Output:*
+```text
+NAME                                   READY   STATUS    RESTARTS   AGE
+demo-dev-deployment-64fc987bf5-h29sk   0/1     Running   0          30s
+```
+Notice:
+- `STATUS` is **Running** (the container started and the process is alive).
+- `READY` is **0/1** (the readiness probe is failing HTTP 404).
+
+#### 3. Inspect Service Endpoints
+Check whether the Service has endpoints available to route traffic:
+```bash
+kubectl get endpointslices -n helm-lab -l kubernetes.io/service-name=demo-dev-service
+```
+*Output:*
+```text
+NAME                     ADDRESSTYPE   PORTS   ENDPOINTS   AGE
+demo-dev-service-abc12   IPv4          80                  2m
+```
+Notice that `ENDPOINTS` is completely empty! Because the Pod failed readiness, Kubernetes removed its IP address from the Service to protect users from receiving errors.
+
+#### 4. How to Recover
+Restore the readiness probe path to `/`:
+
+```bash
+helm upgrade demo-dev ./charts/nginx-demo -n helm-lab --reset-values -f ./charts/nginx-demo/values-dev.yaml --wait --timeout 120s
+```
+
+Verify that the Pod becomes `READY 1/1` and the endpoint is restored:
+```bash
+kubectl get pods -n helm-lab -l app=demo-dev
+kubectl get endpointslices -n helm-lab -l kubernetes.io/service-name=demo-dev-service
+```
+*Output:*
+```text
+NAME                                   READY   STATUS    RESTARTS   AGE
+demo-dev-deployment-7bb9cf9475-x2n4p   1/1     Running   0          10s
+
+NAME                     ADDRESSTYPE   PORTS   ENDPOINTS      AGE
+demo-dev-service-abc12   IPv4          80      10.42.0.45     3m
+```
+
+---
+
 ## Key Takeaways
 
 | Feature | Function |

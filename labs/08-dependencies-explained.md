@@ -80,6 +80,54 @@ The child **cannot** see any other parent values (e.g., `replicaCount`, `image`,
 
 ---
 
+## Break It and Recover — Detailed Walkthrough
+
+### What the challenge asks:
+> Delete only the generated `charts/nginx-demo/charts/lab-banner-0.1.0.tgz`, keeping the source chart and lock file. Try rendering, observe the missing-dependency error, then recover with `helm dependency build`.
+
+#### 1. What to Break
+Simulate cloning a fresh Git repository (where generated `charts/*.tgz` archives are gitignored) by deleting the packaged subchart archive:
+
+```bash
+rm -f charts/nginx-demo/charts/lab-banner-0.1.0.tgz
+```
+
+#### 2. Run the Command
+Attempt to render the parent chart:
+```bash
+helm template demo-dev ./charts/nginx-demo
+```
+
+#### 3. The Error Observed
+```text
+Error: found in Chart.yaml, but missing in charts/ directory: lab-banner
+```
+
+#### 4. Why This Failed
+- When Helm inspects `Chart.yaml` and `Chart.lock`, it validates that every declared dependency exists as a packaged `.tgz` archive or directory inside the chart's `charts/` directory.
+- Unlike tools like `npm` or `pip`, `helm template` and `helm install` will **not** automatically download or package missing dependencies on the fly.
+- If dependencies are missing from `charts/`, Helm halts immediately to prevent deploying an incomplete or broken release.
+
+#### 5. How to Recover
+Rebuild the dependencies strictly from the pinned `Chart.lock`:
+```bash
+helm dependency build ./charts/nginx-demo
+```
+*Output:*
+```text
+Getting lab-banner 0.1.0 from source chart
+Saving 1 charts to charts/
+```
+
+Verify that rendering works again:
+```bash
+helm template demo-dev ./charts/nginx-demo | grep -A 5 "kind: ConfigMap"
+```
+*Output:*
+Both the subchart's `demo-dev-banner` ConfigMap and the parent's `demo-dev-page` ConfigMap render cleanly.
+
+---
+
 ## Key Takeaways
 
 | Concept | Explanation |
