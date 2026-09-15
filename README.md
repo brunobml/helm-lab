@@ -86,34 +86,98 @@ Optional extensions after Lab 7:
 - [Identity and secrets](labs/extensions/identity-and-secrets.md): ServiceAccounts, RBAC, and Secret references
 - [Storage and other workloads](labs/extensions/storage-and-workloads.md): persistence, Jobs, and StatefulSets
 
-## Save your progress
+## Checkpoints and how to use this repository
 
-There are no prebuilt completed-lab tags or solution charts. Each lab names the
-checkpoint **you create after completing it**. Save the initial scaffold in a
-commit first and tag that commit `lab-00-start`. For each completed lab, review
-and commit your chart, lab notes, and progress checkbox, then tag that commit:
+This repository includes prebuilt, cluster-verified reference tags for every milestone in the learning path.
 
+### Available tags
+
+| Checkpoint Tag | Description / State |
+| :--- | :--- |
+| `lab-00-start` | Initial starter scaffold (Deployment, Service, default values) |
+| `lab-01-complete` | Lab 1: First chart installed, rendered, and verified |
+| `lab-02-complete` | Lab 2: Release lifecycle, upgrades, overrides, and rollbacks |
+| `lab-03-complete` | Lab 3: Environment profiles (`values-dev.yaml`, `values-prod.yaml`) |
+| `lab-04-complete` | Lab 4: Template logic (`extraEnv`, `resources`, `with`, `range`, `toYaml`) |
+| `lab-05-complete` | Lab 5: Helpers (`_helpers.tpl`, named templates, standard labels) |
+| `lab-06-complete` | Lab 6: ConfigMaps, volume mounts, and automated rollout checksums |
+| `lab-07-complete` | Lab 7: Validation (`values.schema.json`), test hooks (`tests/http.yaml`), and `NOTES.txt` |
+| `lab-08-complete` | Lab 8: Dependencies (subchart `lab-banner`, `Chart.lock`, global values) |
+| `lab-09-complete` | Lab 9: Packaging (`0.2.0`), OCI registry publishing, and GitOps |
+| `extension-networking-complete` | Extension: Ingress and NodePort configuration |
+| `extension-health-complete` | Extension: Health probes and HorizontalPodAutoscaler (HPA v2) |
+| `extension-identity-complete` | Extension: ServiceAccount, RBAC Role/RoleBinding, and external Secrets |
+| `extension-storage-complete` | Extension: Standalone `storage-demo` chart with PVC persistence |
+
+See [lab-validation.md](lab-validation.md) for full cluster verification logs and findings.
+
+---
+
+### How to practice
+
+You can approach the exercises using any of these workflows:
+
+#### Approach 1: Practice on a local branch (Recommended)
+Work inside this repository without modifying `main` or losing reference solutions:
+1. **Start from the clean scaffold:**
+   ```bash
+   git checkout -b my-learning lab-00-start
+   ```
+2. Follow the lab instructions in `labs/01-first-chart.md` through `labs/09-packaging-and-gitops.md`.
+3. Test commands against your cluster and commit your progress as you complete each lab:
+   ```bash
+   git commit -am "Complete my lab 1"
+   ```
+4. **Compare against the reference solution at any time:**
+   ```bash
+   # See how your code compares to the official solution:
+   git diff lab-01-complete
+   ```
+5. **Return to the fully completed reference anytime:**
+   ```bash
+   git checkout main
+   ```
+
+#### Approach 2: Jump directly into a specific lab
+Want to practice a specific topic (e.g., Lab 4: Template Logic or Lab 6: ConfigMaps) without completing prior labs?
+1. Check out the prerequisite checkpoint into a new branch:
+   ```bash
+   # To start Lab 4, start from Lab 3's completion:
+   git checkout -b practice-lab-04 lab-03-complete
+
+   # To start Lab 6, start from Lab 5's completion:
+   git checkout -b practice-lab-06 lab-05-complete
+   ```
+2. Follow the lab guide, make your changes, and test.
+3. Compare your result with the completion checkpoint:
+   ```bash
+   git diff lab-04-complete
+   ```
+
+#### Approach 3: Practice in a separate folder via Git worktree (Zero conflict)
+If you want to keep this repo as your read-only manual while coding in an independent directory:
 ```bash
-git diff
-# Stage the specific files you changed, then commit them.
-git commit -m "Complete lab 1: first chart"
-git tag lab-01-complete
+# Create an isolated practice workspace pointing to the starting tag:
+git worktree add ../helm-lab-practice lab-00-start
+cd ../helm-lab-practice
+
+# Work through labs, run cluster tests, and commit freely in this folder!
+```
+When you are done:
+```bash
+cd /home/bleite/repos/helm-lab
+git worktree remove ../helm-lab-practice
 ```
 
-A Git checkpoint captures source files. Helm revisions capture a release's
-cluster history; rolling back Helm does not roll back your Git files.
-
-Inspect a checkpoint without replacing your working files:
-
+#### Approach 4: Inspect solutions without editing code
+Inspect what changes between any two labs:
 ```bash
-git show lab-01-complete:charts/nginx-demo/templates/deployment.yaml
-git diff lab-01-complete lab-02-complete -- charts/nginx-demo
-```
+# See the exact changes introduced in Lab 5:
+git diff lab-04-complete lab-05-complete -- charts/nginx-demo
 
-To retry a completed lab, create a separate worktree from its starting tag (once
-that tag exists), and use a different release name or clean up the earlier lab
-release before installing. See [the lab template](labs/TEMPLATE.md) for a place
-to record observations, commands, failures, and explanations.
+# View the full contents of a file at a specific tag:
+git show lab-06-complete:charts/nginx-demo/templates/deployment.yaml
+```
 
 ## Cleanup
 
