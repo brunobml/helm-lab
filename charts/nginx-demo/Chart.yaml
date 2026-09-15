@@ -1,6 +1,6 @@
 apiVersion: v2
-name: helm-lab
-description: A Helm chart for learning and experimentation
+name: nginx-demo
+description: A small NGINX application for the Helm Lab exercises
 
 # A chart can be either an 'application' or a 'library' chart.
 #
@@ -21,6 +21,6 @@ version: 0.1.0
 # incremented each time you make changes to the application. Versions are not expected to
 # follow Semantic Versioning. They should reflect the version the application is using.
 # It is recommended to use it with quotes.
-appVersion: "1.0.0"
+appVersion: "1.30.4"
 
 icon: https://raw.githubusercontent.com/cncf/artwork/master/projects/helm/icon/color/helm-icon-color.png

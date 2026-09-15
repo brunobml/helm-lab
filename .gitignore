@@ -1,8 +1,7 @@
 # Helm
 *.tgz
-Chart.lock
-charts/*.tgz
-/charts/**/charts/
+# Keep Chart.lock and hand-written subchart sources in Git.
+/dist/
 
 # Local editor / tool settings
 .vscode/

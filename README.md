@@ -1,158 +1,137 @@
-# Helm Mastery: From First Chart to Production GitOps
+# Helm Lab
 
-A structured, progressive roadmap for mastering Helm chart development, templating, packaging, and lifecycle management.
+Learn Helm by evolving one small NGINX application, one lab at a time.
+The working chart starts with a Deployment and Service. You implement the later
+features yourself; lab instructions explain what to change and how to verify it.
 
----
+## Names and layout
 
-## Roadmap Overview
+| Name | Meaning |
+| --- | --- |
+| `helm-lab` | This learning repository and the local cluster/namespace |
+| `nginx-demo` | The chart: a reusable application package |
+| `demo-dev`, `demo-prod` | Releases: independently configured installations |
+| `nginx` | The container running inside each application Pod |
 
-```
-Phase 1: Fundamentals (Completed)
-   │
-   ▼
-Phase 2: Template Logic & Helpers
-   │
-   ▼
-Phase 3: Config, Secrets & State
-   │
-   ▼
-Phase 4: Networking & Extensibility
-   │
-   ▼
-Phase 5: Multi-Env, Packaging & OCI
-   │
-   ▼
-Phase 6: Testing, CI/CD & GitOps
+```text
+charts/nginx-demo/   Your evolving chart
+labs/               Ordered exercises, hints, and completion checks
+labs/extensions/    Optional Kubernetes-focused exercises
 ```
 
----
+The chart previously lived at `helm-lab/`; its path is now `charts/nginx-demo/`.
+Existing cluster releases are not migrated by this repository change. Start these
+labs with the release names below in a dedicated learning namespace.
 
-## Phase 1: Core Fundamentals (Completed ✅)
+## Set up once
 
-- [x] Helm architecture (`Chart.yaml`, `values.yaml`, `templates/`)
-- [x] Basic templating syntax (`{{ .Values.<key> }}`)
-- [x] Chart linting and rendering (`helm lint`, `helm template`)
-- [x] Release lifecycle (`helm install`, `helm upgrade`, `helm rollback`, `helm uninstall`)
-- [x] Value overrides via CLI (`--set`)
+Use Bash (or a compatible shell), Git, Helm, kubectl, curl, and a disposable
+Kubernetes cluster. You should recognize a Pod, Deployment, Service, and namespace;
+Lab 1 connects those objects to Helm.
 
----
+Local linting and rendering were checked with **Helm 3.19.0**. Cluster exercises
+have not been executed as part of this restructuring. Record your Helm and
+Kubernetes server versions in your learning notes. These instructions use Helm 3
+semantics; consult the matching documentation if using another major version.
 
-## Phase 2: Template Logic, Functions & Helpers
+For a local cluster, install Docker and [kind](https://kind.sigs.k8s.io/docs/user/quick-start/),
+then run:
 
-Learn how to write dynamic, reusable, and robust templates instead of static substitutions.
+```bash
+kind create cluster --name helm-lab --wait 120s
+kubectl config use-context kind-helm-lab
+kubectl cluster-info
+kubectl get nodes
+helm version --short
+kubectl version
+```
 
-### Key Objectives
-- Master whitespace control (`{{-` and `-}}`) and understand YAML formatting hazards.
-- Use pipeline functions: `default`, `quote`, `upper`, `lower`, `toJson`.
-- Indentation management with `indent` and `nindent`.
-- Flow control:
-  - Conditionals: `{{- if }} ... {{- else if }} ... {{- else }} ... {{- end }}`
-  - Loops: `{{- range }}` for maps and slices.
-  - Scoping: `{{- with }}` and the `$` root context trap.
-- Reusable partials in `templates/_helpers.tpl`:
-  - `define` and `include`
-  - Chart name formatting and Kubernetes 63-character truncation (`trunc 63 | trimSuffix "-"`)
-  - Standard Kubernetes labels (`app.kubernetes.io/name`, `instance`, `version`, `managed-by`)
+If you already have a disposable cluster, select its context instead. Run **all
+lab commands from this repository's root**. Rendering and linting work without a
+cluster; installs, upgrades, port-forwarding, and Helm tests need one.
 
-### Practice Project
-> Refactor `helm-lab` to use `_helpers.tpl` for standard labels and selector labels. Add an optional `extraEnv` map in `values.yaml` rendered with a `range` loop in `deployment.yaml`.
+```bash
+helm lint ./charts/nginx-demo
+helm template demo-dev ./charts/nginx-demo
+```
 
----
+Continue with [Lab 1](labs/01-first-chart.md) to install the application.
 
-## Phase 3: Configuration, Secrets & Application State
+## Learning path
 
-Manage configuration updates, sensitive data, and persistent storage safely.
+Check off a lab when its verification steps pass and you can answer its questions.
+If you already completed the original fundamentals, use Labs 1–3 as a short review.
 
-### Key Objectives
-- Dynamically generate `ConfigMap` and `Secret` templates.
-- Inject values via `env`, `envFrom`, and volume mounts.
-- Automate rolling restarts on config changes:
-  ```yaml
-  annotations:
-    checksum/config: {{ include (print $.Template.BasePath "/configmap.yaml") . | sha256sum }}
-  ```
-- Implement `PersistentVolumeClaim` (PVC) templates with configurable storage classes and access modes.
-- Set up resource requests and limits (`resources.limits`, `resources.requests`) using `toYaml` and `nindent`.
+- [ ] [1. First chart](labs/01-first-chart.md) — connect values, templates, and running resources
+- [ ] [2. Release lifecycle](labs/02-release-lifecycle.md) — upgrade, inspect, rollback, and recover
+- [ ] [3. Values and environments](labs/03-values-and-environments.md) — precedence and separate releases
+- [ ] [4. Template logic](labs/04-template-logic.md) — conditionals, loops, scope, and indentation
+- [ ] [5. Helpers and labels](labs/05-helpers-and-labels.md) — reuse code without breaking selectors
+- [ ] [6. ConfigMaps and rollouts](labs/06-configmaps-and-rollouts.md) — change the page through Helm
+- [ ] [7. Validation and tests](labs/07-validation-and-tests.md) — catch invalid inputs and test HTTP
+- [ ] [8. Dependencies](labs/08-dependencies.md) — compose charts and lock versions
+- [ ] [9. Packaging and GitOps](labs/09-packaging-and-gitops.md) — distribute and reconcile the chart
 
-### Practice Project
-> Add a custom NGINX `index.html` via a `ConfigMap`. Update `deployment.yaml` with the SHA256 checksum annotation and verify that running `helm upgrade` with updated HTML content automatically triggers a rolling deployment.
+Optional extensions after Lab 7:
 
----
+- [Networking](labs/extensions/networking.md): Service types and Ingress
+- [Workload health and scaling](labs/extensions/health-and-scaling.md): probes, resources, and HPA
+- [Identity and secrets](labs/extensions/identity-and-secrets.md): ServiceAccounts, RBAC, and Secret references
+- [Storage and other workloads](labs/extensions/storage-and-workloads.md): persistence, Jobs, and StatefulSets
 
-## Phase 4: Networking, Scaling & Workload Variety
+## Save your progress
 
-Broaden the chart to handle real-world traffic routing and workload types.
+There are no prebuilt completed-lab tags or solution charts. Each lab names the
+checkpoint **you create after completing it**. Save the initial scaffold in a
+commit first and tag that commit `lab-00-start`. For each completed lab, review
+and commit your chart, lab notes, and progress checkbox, then tag that commit:
 
-### Key Objectives
-- Dynamic Service types: toggle between `ClusterIP`, `NodePort`, and `LoadBalancer`.
-- Template an `Ingress` resource supporting multiple hosts, paths, and TLS certificates.
-- Configure probes: `livenessProbe`, `readinessProbe`, and `startupProbe`.
-- Support Horizontal Pod Autoscalers (`HorizontalPodAutoscaler` / HPA).
-- Explore other controller templates: `DaemonSet`, `StatefulSet`, `Job`, and `CronJob`.
-- RBAC: conditionally render `ServiceAccount`, `ClusterRole`, and `ClusterRoleBinding` templates controlled by a `serviceAccount.create` flag (mirrors `helm create` scaffold defaults).
+```bash
+git diff
+# Stage the specific files you changed, then commit them.
+git commit -m "Complete lab 1: first chart"
+git tag lab-01-complete
+```
 
-### Practice Project
-> Create an optional `ingress.yaml` template controlled by `ingress.enabled: true|false`. Then add a `serviceaccount.yaml` template gated on `serviceAccount.create: true|false` and wire the service account name into the Deployment's `spec.template.spec.serviceAccountName`. Test both with `helm template`.
+A Git checkpoint captures source files. Helm revisions capture a release's
+cluster history; rolling back Helm does not roll back your Git files.
 
----
+Inspect a checkpoint without replacing your working files:
 
-## Phase 5: Dependencies, Subcharts & OCI Packaging
+```bash
+git show lab-01-complete:charts/nginx-demo/templates/deployment.yaml
+git diff lab-01-complete lab-02-complete -- charts/nginx-demo
+```
 
-Package, distribute, and compose complex applications.
+To retry a completed lab, create a separate worktree from its starting tag (once
+that tag exists), and use a different release name or clean up the earlier lab
+release before installing. See [the lab template](labs/TEMPLATE.md) for a place
+to record observations, commands, failures, and explanations.
 
-### Key Objectives
-- Subcharts & dependencies in `Chart.yaml`:
-  ```yaml
-  dependencies:
-    - name: redis
-      version: 17.x.x
-      repository: https://charts.bitnami.com/bitnami
-      condition: redis.enabled
-  ```
-- Managing subchart values from parent `values.yaml`.
-- Global values (`.Values.global.*`).
-- Modern chart distribution via OCI (Open Container Initiative) registries:
-  - `helm package <chart>`
-  - `helm push <package.tgz> oci://<registry-url>/<namespace>`
-  - `helm install <release> oci://<registry-url>/<namespace>/<chart>`
+## Cleanup
 
-### Practice Project
-> Add a Redis subchart dependency to `helm-lab`. Expose a flag `redis.enabled` in `values.yaml` and verify that `helm dependency update` downloads the dependency archive.
+Keep `demo-dev` between labs unless a lab says otherwise. Stop port-forwarding
+with Ctrl+C. When finished, list releases and uninstall the ones you created:
 
----
+```bash
+helm list -n helm-lab
+helm uninstall demo-dev -n helm-lab
+# Run only if you installed these releases:
+helm uninstall demo-prod -n helm-lab
+helm uninstall demo-package -n helm-lab
+```
 
-## Phase 6: Testing, GitOps & Production Best Practices
+If you used the dedicated kind cluster and want to remove all its resources:
 
-Integrate Helm into automated CI/CD and GitOps workflows.
+```bash
+kind delete cluster --name helm-lab
+```
 
-### Key Objectives
-- Chart testing:
-  - Built-in test hooks (`helm.sh/hook: test`)
-  - Automated unit testing with the `helm-unittest` plugin
-- Schema & style enforcement:
-  - `values.schema.json` (JSON Schema) for input validation
-  - `ct` (Chart Testing CLI) for linting and style enforcement
-- Environment isolation patterns:
-  - `values.yaml` (defaults)
-  - `values-dev.yaml`
-  - `values-staging.yaml`
-  - `values-prod.yaml`
-- GitOps deployment patterns with Argo CD or Flux CD:
-  - Helm repository source vs. Git repository source
-  - Value file overrides in Application CRDs
+## References
 
----
+- [Using Helm](https://helm.sh/docs/v3/intro/using_helm/)
+- [Template guide](https://helm.sh/docs/v3/chart_template_guide/)
+- [Chart format and values schemas](https://helm.sh/docs/v3/topics/charts/)
 
-## Essential CLI Cheat Sheet
-
-| Task | Command |
-| :--- | :--- |
-| **Lint syntax** | `helm lint <chart-path>` |
-| **Render dry-run** | `helm template <release-name> <chart-path> -f <values.yaml>` |
-| **Debug install** | `helm install <release-name> <chart-path> --dry-run --debug` |
-| **Inspect values** | `helm get values <release-name>` |
-| **Inspect all manifests** | `helm get manifest <release-name>` |
-| **Revision history** | `helm history <release-name>` |
-| **Rollback revision** | `helm rollback <release-name> <revision-number>` |
-| **Package chart** | `helm package <chart-path>` |
-| **Update dependencies** | `helm dependency update <chart-path>` |
+This is a learning chart. Advanced features are introduced by the labs as you
+need them.

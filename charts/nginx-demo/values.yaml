@@ -1,0 +1,15 @@
+# replicaCount controls how many NGINX Pods the Deployment runs.
+replicaCount: 2
+
+image:
+  repository: nginx
+  # Explicit application version; use a digest for immutable image identity.
+  tag: "1.30.4-alpine"
+  pullPolicy: IfNotPresent
+
+service:
+  type: ClusterIP
+  # port is the Service's listening port; it may differ from the container port.
+  port: 80
+  # targetPort must match NGINX's listening port. This does not configure NGINX.
+  targetPort: 80
