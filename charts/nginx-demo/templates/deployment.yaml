@@ -5,7 +5,9 @@ metadata:
   labels:
     {{- include "nginx-demo.labels" . | nindent 4 }}
 spec:
+  {{- if not .Values.autoscaling.enabled }}
   replicas: {{ .Values.replicaCount }}
+  {{- end }}
   selector:
     matchLabels:
       {{- include "nginx-demo.selectorLabels" . | nindent 6 }}
@@ -27,6 +29,14 @@ spec:
             - name: html
               mountPath: /usr/share/nginx/html
               readOnly: true
+          {{- with .Values.livenessProbe }}
+          livenessProbe:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          {{- with .Values.readinessProbe }}
+          readinessProbe:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
           {{- with .Values.extraEnv }}
           env:
             {{- range $name, $value := . }}

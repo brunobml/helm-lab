@@ -38,3 +38,19 @@ ingress:
         - path: /
           pathType: ImplementationSpecific
   tls: []
+
+livenessProbe:
+  httpGet:
+    path: /
+    port: 80
+
+readinessProbe:
+  httpGet:
+    path: /
+    port: 80
+
+autoscaling:
+  enabled: false
+  minReplicas: 1
+  maxReplicas: 5
+  targetCPUUtilizationPercentage: 80
