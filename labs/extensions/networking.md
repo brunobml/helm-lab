@@ -45,6 +45,9 @@ pending on a local cluster without a cloud controller or MetalLB.
 
 What creates an Ingress object, and what actually handles its traffic?
 
+> [!TIP]
+> See [networking-explained.md](networking-explained.md) for detailed explanations and answers to this question.
+
 ## Cleanup and checkpoint
 
 Disable the Ingress through a Helm upgrade, restore ClusterIP, and remove any

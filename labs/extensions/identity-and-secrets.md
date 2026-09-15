@@ -39,6 +39,9 @@ Reference a nonexistent Secret, observe the Pod configuration error with
 Why are `serviceAccount.create` and `rbac.create` independent? When would a
 namespaced Role be more appropriate than a ClusterRole?
 
+> [!TIP]
+> See [identity-and-secrets-explained.md](identity-and-secrets-explained.md) for detailed explanations and answers to these questions.
+
 ## Cleanup and checkpoint
 
 Remove the Secret reference via upgrade before deleting `demo-learning`. Disable

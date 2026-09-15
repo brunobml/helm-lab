@@ -124,6 +124,9 @@ count afterward. Revert that Git change, push, and sync to practice recovery.
 - Why is an explicit artifact version useful?
 - Who owns deployment history when Argo CD renders a Helm chart?
 
+> [!TIP]
+> See [09-packaging-and-gitops-explained.md](09-packaging-and-gitops-explained.md) for detailed explanations and answers to these questions.
+
 ## Cleanup and checkpoint
 
 ```bash

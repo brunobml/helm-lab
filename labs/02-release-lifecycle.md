@@ -55,6 +55,9 @@ with that revision number. Verify the Deployment is healthy again.
 - Does a successful render imply a successful rollout?
 - Which command showed the cause of the failure?
 
+> [!TIP]
+> See [02-release-lifecycle-explained.md](02-release-lifecycle-explained.md) for detailed explanations and answers to these questions.
+
 ## Cleanup and checkpoint
 
 Practice uninstalling, then restore the baseline for Lab 3:

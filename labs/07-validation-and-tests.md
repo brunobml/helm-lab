@@ -55,6 +55,9 @@ the application release.
 - What can an HTTP test catch that linting does not?
 - Why is `replicaCount: 0` valid even though the HTTP test would then fail?
 
+> [!TIP]
+> See [07-validation-and-tests-explained.md](07-validation-and-tests-explained.md) for detailed explanations and answers to these questions.
+
 ## Cleanup and checkpoint
 
 Keep the corrected test and schema. Remove any retained failed test Pod after

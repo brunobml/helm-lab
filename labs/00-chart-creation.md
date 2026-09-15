@@ -173,6 +173,9 @@ Helm enforces Semantic Versioning on the chart version. Restore `version: 0.1.0`
 - What does `.helmignore` do when running `helm package`?
 - Why did we delete `templates/*` instead of using the generated boilerplate immediately?
 
+> [!TIP]
+> See [00-chart-creation-explained.md](00-chart-creation-explained.md) for detailed explanations and answers to these questions.
+
 ---
 
 ## Cleanup and checkpoint

@@ -37,6 +37,9 @@ Pod and unavailable Service endpoints. Restore `/` and verify readiness.
 Why should liveness failures restart a container while readiness failures remove
 it from traffic? Why does CPU utilization scaling need a CPU request?
 
+> [!TIP]
+> See [health-and-scaling-explained.md](health-and-scaling-explained.md) for detailed explanations and answers to these questions.
+
 ## Cleanup and checkpoint
 
 Stop load generation, disable autoscaling, and restore the dev replica count

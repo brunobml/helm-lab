@@ -44,6 +44,9 @@ Remove the version from selectors before continuing.
 - Why prefix helper names with `nginx-demo`?
 - Why could renaming resources turn a refactor into resource replacement?
 
+> [!TIP]
+> See [05-helpers-and-labels-explained.md](05-helpers-and-labels-explained.md) for detailed explanations and answers to these questions.
+
 ## Cleanup and checkpoint
 
 Stop port-forwarding. Keep resource names and selectors compatible with earlier

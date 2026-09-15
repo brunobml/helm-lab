@@ -49,6 +49,9 @@ output. Also try a wrong indentation level and inspect where `env` lands.
 - Why must an environment variable value be rendered as a string?
 - What does the leading dash in `{{-` remove?
 
+> [!TIP]
+> See [04-template-logic-explained.md](04-template-logic-explained.md) for detailed explanations and answers to these questions.
+
 ## Cleanup and checkpoint
 
 Keep the successful dev configuration and release. Commit and create

@@ -94,6 +94,9 @@ is not a content hash for every source file; Git tracks those files.
 - Why commit the lock file but ignore generated archives?
 - When would you intentionally use `update` instead of `build`?
 
+> [!TIP]
+> See [08-dependencies-explained.md](08-dependencies-explained.md) for detailed explanations and answers to these questions.
+
 ## Cleanup and checkpoint
 
 Keep the child source, parent dependency settings, and `Chart.lock` in Git.

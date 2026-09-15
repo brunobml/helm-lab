@@ -45,6 +45,9 @@ rollout. Restore the checksum under Pod-template metadata and verify replacement
 - How do you distinguish a file update from a Pod replacement?
 - Why does indentation matter for multiline HTML?
 
+> [!TIP]
+> See [06-configmaps-and-rollouts-explained.md](06-configmaps-and-rollouts-explained.md) for detailed explanations and answers to these questions.
+
 ## Cleanup and checkpoint
 
 Stop port-forwarding; keep the working ConfigMap and checksum. Commit and create

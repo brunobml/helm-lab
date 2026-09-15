@@ -52,6 +52,9 @@ value changes NGINX's configuration. Keep targetPort at 80.
 - Why can two releases of the same chart coexist?
 - How would separate namespaces improve environment isolation?
 
+> [!TIP]
+> See [03-values-and-environments-explained.md](03-values-and-environments-explained.md) for detailed explanations and answers to these questions.
+
 ## Cleanup and checkpoint
 
 ```bash

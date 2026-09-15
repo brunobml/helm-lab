@@ -41,6 +41,9 @@ exercise data, uninstall and recreate the claim after understanding data loss.
 What survives a Pod replacement? How do PVC ownership, retention, and a volume's
 reclaim policy affect cleanup? Why is a StatefulSet more than a Deployment with a disk?
 
+> [!TIP]
+> See [storage-and-workloads-explained.md](storage-and-workloads-explained.md) for detailed explanations and answers to these questions.
+
 ## Cleanup and checkpoint
 
 Uninstall `storage-demo`, inspect remaining PVCs/PVs, and remove only disposable

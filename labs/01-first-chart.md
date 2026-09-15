@@ -48,6 +48,9 @@ Do not deploy this broken version; later you will add input validation.
 - Which files are Helm inputs, and which output is Kubernetes YAML?
 - How does the Service find the application's Pods?
 
+> [!TIP]
+> See [01-first-chart-explained.md](01-first-chart-explained.md) for detailed explanations and answers to these questions.
+
 ## Cleanup and checkpoint
 
 Stop port-forwarding with Ctrl+C. Keep `demo-dev` installed for Lab 2. Record
