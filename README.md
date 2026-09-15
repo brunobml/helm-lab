@@ -34,12 +34,19 @@ have not been executed as part of this restructuring. Record your Helm and
 Kubernetes server versions in your learning notes. These instructions use Helm 3
 semantics; consult the matching documentation if using another major version.
 
-For a local cluster, install Docker and [kind](https://kind.sigs.k8s.io/docs/user/quick-start/),
-then run:
+For a local cluster, install Docker and either [kind](https://kind.sigs.k8s.io/docs/user/quick-start/)
+or [k3d](https://k3d.io/), then run:
 
 ```bash
+# With kind:
 kind create cluster --name helm-lab --wait 120s
 kubectl config use-context kind-helm-lab
+
+# Or with k3d:
+k3d cluster create helm-lab
+kubectl config use-context k3d-helm-lab
+
+# Verify connectivity:
 kubectl cluster-info
 kubectl get nodes
 helm version --short
@@ -121,10 +128,13 @@ helm uninstall demo-prod -n helm-lab
 helm uninstall demo-package -n helm-lab
 ```
 
-If you used the dedicated kind cluster and want to remove all its resources:
+If you used a dedicated local cluster and want to remove all its resources:
 
 ```bash
+# With kind:
 kind delete cluster --name helm-lab
+# Or with k3d:
+k3d cluster delete helm-lab
 ```
 
 ## References
