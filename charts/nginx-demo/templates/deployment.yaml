@@ -19,5 +19,4 @@ spec:
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
           imagePullPolicy: {{ .Values.image.pullPolicy }}
           ports:
-            # Declares the image's default port; it does not configure the server.
             - containerPort: 80
