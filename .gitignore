@@ -1,0 +1,13 @@
+# Helm
+*.tgz
+Chart.lock
+charts/*.tgz
+/charts/**/charts/
+
+# Local editor / tool settings
+.vscode/
+.claude/
+
+# OS files
+.DS_Store
+Thumbs.db
