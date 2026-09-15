@@ -13,8 +13,9 @@
 3. Add `templates/tests/http.yaml`: a Pod with annotation `helm.sh/hook: test`
    that requests `http://<release>-service:<service.port>/`. Use the same NGINX
    Alpine image values as the application and its available `wget` command.
-   Set `restartPolicy: Never` and a hook deletion policy of
-   `before-hook-creation,hook-succeeded` so tests can be rerun.
+   Set `restartPolicy: Never` and a hook deletion policy of `before-hook-creation`
+   so test logs remain readable with `--logs` and previous test pods are cleaned up
+   before new runs.
 4. Add a short `templates/NOTES.txt` with the correct namespace-aware
    port-forward command, using the Service-name helper and Service port.
 
@@ -36,10 +37,10 @@ helm test demo-dev -n helm-lab --logs --timeout 60s
 helm status demo-dev -n helm-lab
 ```
 
-Expect a passing HTTP test and useful access instructions. Successful-hook
-cleanup may remove logs before they can be fetched; temporarily keep successful
-Pods if you need to inspect them. Extend the test to check for your expected
-heading if you want to verify content as well as HTTP availability.
+Expect a passing HTTP test and useful access instructions. If you include
+`hook-succeeded` in the delete policy, Helm will delete the pod immediately upon
+success, which can cause `--logs` to fail with "pod not found". Extend the test
+to check for your expected heading if you want to verify content as well as HTTP availability.
 
 ## Break it and recover
 
@@ -60,9 +61,54 @@ Keep the corrected test and schema. Remove any retained failed test Pod after
 inspection. Commit and create `lab-07-complete`.
 
 <details>
-<summary>Hint: test container</summary>
+<summary>Hint: values.schema.json</summary>
+
+```json
+{
+  "$schema": "https://json-schema.org/draft-07/schema#",
+  "title": "Values",
+  "type": "object",
+  "required": ["replicaCount", "image", "service"],
+  "properties": {
+    "replicaCount": { "type": "integer", "minimum": 0 },
+    "image": {
+      "type": "object",
+      "required": ["repository", "tag"],
+      "properties": {
+        "repository": { "type": "string", "minLength": 1 },
+        "tag": { "type": "string", "minLength": 1 },
+        "pullPolicy": { "type": "string" }
+      }
+    },
+    "service": {
+      "type": "object",
+      "required": ["port", "targetPort"],
+      "properties": {
+        "type": { "type": "string" },
+        "port": { "type": "integer", "minimum": 1, "maximum": 65535 },
+        "targetPort": { "type": "integer", "minimum": 1, "maximum": 65535 }
+      }
+    }
+  }
+}
+```
+
+</details>
+
+<details>
+<summary>Hint: test container and annotations</summary>
 
 ```yaml
+apiVersion: v1
+kind: Pod
+metadata:
+  name: "{{ .Release.Name }}-http-test"
+  labels:
+    app.kubernetes.io/name: {{ .Chart.Name }}
+    app.kubernetes.io/instance: {{ .Release.Name }}
+  annotations:
+    "helm.sh/hook": test
+    "helm.sh/hook-delete-policy": before-hook-creation
 spec:
   restartPolicy: Never
   containers:
@@ -77,6 +123,17 @@ spec:
 
 Give the test Pod a name such as `<release>-http-test`. Do not give it the
 application's selector labels: it must not become a Service endpoint.
+
+</details>
+
+<details>
+<summary>Hint: templates/NOTES.txt</summary>
+
+```text
+1. Get the application URL by running these commands:
+  kubectl --namespace {{ .Release.Namespace }} port-forward service/{{ include "nginx-demo.serviceName" . }} 8080:{{ .Values.service.port }}
+  curl http://127.0.0.1:8080
+```
 
 </details>
 
