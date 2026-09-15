@@ -11,6 +11,8 @@ spec:
       {{- include "nginx-demo.selectorLabels" . | nindent 6 }}
   template:
     metadata:
+      annotations:
+        checksum/config: {{ include (print $.Template.BasePath "/configmap.yaml") . | sha256sum }}
       labels:
         {{- include "nginx-demo.labels" . | nindent 8 }}
     spec:
@@ -21,6 +23,10 @@ spec:
           ports:
             # Declares the image's default port; it does not configure the server.
             - containerPort: 80
+          volumeMounts:
+            - name: html
+              mountPath: /usr/share/nginx/html
+              readOnly: true
           {{- with .Values.extraEnv }}
           env:
             {{- range $name, $value := . }}
@@ -32,3 +38,7 @@ spec:
           resources:
             {{- toYaml . | nindent 12 }}
           {{- end }}
+      volumes:
+        - name: html
+          configMap:
+            name: {{ .Release.Name }}-page

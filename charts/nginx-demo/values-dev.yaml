@@ -10,3 +10,6 @@ resources:
     memory: 32Mi
   limits:
     memory: 128Mi
+
+pageContent: |
+  <h1>Hello from Updated Helm Lab</h1>

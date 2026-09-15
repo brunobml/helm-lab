@@ -17,3 +17,6 @@ service:
 extraEnv: {}
 
 resources: {}
+
+pageContent: |
+  <h1>Hello from Helm Lab</h1>

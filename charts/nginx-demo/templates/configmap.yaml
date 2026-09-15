@@ -1,0 +1,9 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ .Release.Name }}-page
+  labels:
+    {{- include "nginx-demo.labels" . | nindent 4 }}
+data:
+  index.html: |
+    {{- .Values.pageContent | nindent 4 }}
