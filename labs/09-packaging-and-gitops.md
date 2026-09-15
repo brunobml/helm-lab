@@ -31,9 +31,23 @@ experimental edit; package a new chart version when you want a new artifact.
 
 ## B. Publish to OCI
 
-Choose a registry and namespace you control; replace the example values below.
-Create its repository first if your registry requires it. Authenticate using
-its documented credential flow; do not put credentials in values or Git.
+You can publish to either a zero-configuration local registry or an external registry.
+
+### Option 1: Fast local registry (self-contained, no auth required)
+
+```bash
+docker run -d -p 5001:5000 --name helm-registry registry:2
+LAB_REGISTRY=localhost:5001
+LAB_REGISTRY_NAMESPACE=helm-lab
+
+helm push ./dist/nginx-demo-0.2.0.tgz "oci://$LAB_REGISTRY/$LAB_REGISTRY_NAMESPACE"
+helm show chart "oci://$LAB_REGISTRY/$LAB_REGISTRY_NAMESPACE/nginx-demo" --version 0.2.0
+helm template demo-oci "oci://$LAB_REGISTRY/$LAB_REGISTRY_NAMESPACE/nginx-demo" --version 0.2.0
+```
+
+### Option 2: External registry (GHCR, Harbor, Docker Hub, ECR, etc.)
+
+Choose a registry and namespace you control; replace the example values below:
 
 ```bash
 LAB_REGISTRY=registry.example.com
@@ -45,8 +59,9 @@ helm template demo-oci "oci://$LAB_REGISTRY/$LAB_REGISTRY_NAMESPACE/nginx-demo" 
 ```
 
 Expect remote metadata and rendering to match the packaged chart. Publishing an
-artifact does not install a release. As a follow-up, contrast an OCI reference
-with a traditional chart repository's `helm repo add` and `helm repo update`.
+artifact does not install a release. In Helm 3, OCI packaging replaces legacy HTTP
+chart repositories (which required hosting an `index.yaml` and running `helm repo add` /
+`helm repo update`).
 
 ## C. Let Git drive deployment
 
@@ -113,6 +128,8 @@ count afterward. Revert that Git change, push, and sync to practice recovery.
 
 ```bash
 helm uninstall demo-package -n helm-lab
+# If you used the local registry in Option 1:
+docker rm -f helm-registry 2>/dev/null || true
 ```
 
 If you completed C, delete the Application with Argo CD's cascading deletion
