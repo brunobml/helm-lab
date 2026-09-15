@@ -10,6 +10,7 @@ During this validation process, several friction points were resolved, instructi
 
 | Lab / Topic | Validation Outcome | Instructions & Hints Improved | Checkpoint Tag |
 | :--- | :--- | :--- | :--- |
+| **Lab 0: Chart Creation** | `helm create`, inspecting structure, stripping templates, configuring `Chart.yaml`, minimal values, and linting verified. | Added full Lab 0 guide with explanation of `version` vs `appVersion` and `.helmignore`. | `lab-00-start` |
 | **Lab 1: First Chart** | `helm lint`, `helm template`, `helm install`, `kubectl rollout`, `port-forward`, and `curl` verified. Missing value break-and-recover tested. | Clarified file roles and output expectations. | `lab-01-complete` |
 | **Lab 2: Release Lifecycle** | Revision tracking, `--set` overrides, rollback to revision 1, and timed-out upgrade failure with image pull error verified. | Documented revision mechanics and rollback behaviors. | `lab-02-complete` |
 | **Lab 3: Values & Environments** | `values-dev.yaml` and `values-prod.yaml` created. Precedence rules and multi-release coexistence verified on the cluster. | Explicit guidance on `--reset-values` vs persistent `--set` flags. | `lab-03-complete` |

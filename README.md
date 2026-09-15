@@ -62,13 +62,15 @@ helm lint ./charts/nginx-demo
 helm template demo-dev ./charts/nginx-demo
 ```
 
-Continue with [Lab 1](labs/01-first-chart.md) to install the application.
+Start with [Lab 0](labs/00-chart-creation.md) to scaffold your chart with `helm create`,
+or jump to [Lab 1](labs/01-first-chart.md) if you want to start directly with the prebuilt starter.
 
 ## Learning path
 
 Check off a lab when its verification steps pass and you can answer its questions.
-If you already completed the original fundamentals, use Labs 1–3 as a short review.
+If you already completed the original fundamentals, use Labs 0–3 as a short review.
 
+- [ ] [0. Chart creation](labs/00-chart-creation.md) — scaffold with helm create, strip boilerplate, and set metadata
 - [ ] [1. First chart](labs/01-first-chart.md) — connect values, templates, and running resources
 - [ ] [2. Release lifecycle](labs/02-release-lifecycle.md) — upgrade, inspect, rollback, and recover
 - [ ] [3. Values and environments](labs/03-values-and-environments.md) — precedence and separate releases
@@ -94,7 +96,7 @@ This repository includes prebuilt, cluster-verified reference tags for every mil
 
 | Checkpoint Tag | Description / State |
 | :--- | :--- |
-| `lab-00-start` | Initial starter scaffold (Deployment, Service, default values) |
+| `lab-00-start` | Completed Lab 0 starter scaffold (Deployment, Service, minimal values) |
 | `lab-01-complete` | Lab 1: First chart installed, rendered, and verified |
 | `lab-02-complete` | Lab 2: Release lifecycle, upgrades, overrides, and rollbacks |
 | `lab-03-complete` | Lab 3: Environment profiles (`values-dev.yaml`, `values-prod.yaml`) |

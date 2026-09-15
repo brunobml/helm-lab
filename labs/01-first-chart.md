@@ -1,7 +1,7 @@
 # Lab 1: First chart
 
-**Start:** The committed starter (`lab-00-start`, if you created it), the README
-setup complete, and no `demo-dev` release in namespace `helm-lab`.
+**Start:** The starter chart from [Lab 0: Chart creation](00-chart-creation.md) (or tag `lab-00-start`),
+the README setup complete, and no `demo-dev` release in namespace `helm-lab`.
 **Goal:** Trace a value from a chart to a running NGINX Pod.
 
 ## Steps
