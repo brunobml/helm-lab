@@ -20,3 +20,10 @@ resources: {}
 
 pageContent: |
   <h1>Hello from Helm Lab</h1>
+
+lab-banner:
+  enabled: true
+  message: Hello from the parent
+
+global:
+  environment: local
