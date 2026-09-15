@@ -53,6 +53,9 @@ rm -rf charts/nginx-demo/templates/*
 
 Keep `.helmignore` and the `charts/` folder intact.
 
+> [!NOTE]
+> **Do not commit yet.** At this stage, `templates/` is empty while `values.yaml` and `Chart.yaml` still contain unused boilerplate. You will create your milestone commit (`lab-00-start`) at the end of the lab after completing Steps 4–6 and verifying the chart with `helm lint`.
+
 ### 4. Configure `Chart.yaml`
 
 Replace `charts/nginx-demo/Chart.yaml` with clean, minimal metadata:
