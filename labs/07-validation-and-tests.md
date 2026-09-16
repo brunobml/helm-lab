@@ -5,42 +5,191 @@
 
 ## Steps
 
-1. Add `charts/nginx-demo/values.schema.json`. Require `replicaCount` to be an
-   integer greater than or equal to zero, `image.repository` and `image.tag` to
-   be nonempty strings, and Service ports to be integers from 1 through 65535.
-   Require these fields explicitly; a property's type alone does not require it.
-2. Keep unknown top-level properties allowed while you add future lab features.
-3. Add `templates/tests/http.yaml`: a Pod with annotation `helm.sh/hook: test`
-   that requests `http://<release>-service:<service.port>/`. Use the same NGINX
-   Alpine image values as the application and its available `wget` command.
-   Set `restartPolicy: Never` and a hook deletion policy of `before-hook-creation`
-   so test logs remain readable with `--logs` and previous test pods are cleaned up
-   before new runs.
-4. Add a short `templates/NOTES.txt` with the correct namespace-aware
-   port-forward command, using the Service-name helper and Service port.
+### Step 1: Create `charts/nginx-demo/values.schema.json`
+
+Create a new file at `charts/nginx-demo/values.schema.json`. Helm uses JSON Schema Draft-07 to validate user values during `helm lint`, `helm template`, `helm install`, and `helm upgrade`.
+
+Add the schema definition:
+
+```json
+{
+  "$schema": "https://json-schema.org/draft-07/schema#",
+  "title": "Values",
+  "type": "object",
+  "required": [
+    "replicaCount",
+    "image",
+    "service"
+  ],
+  "properties": {
+    "replicaCount": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "image": {
+      "type": "object",
+      "required": [
+        "repository",
+        "tag"
+      ],
+      "properties": {
+        "repository": {
+          "type": "string",
+          "minLength": 1
+        },
+        "tag": {
+          "type": "string",
+          "minLength": 1
+        },
+        "pullPolicy": {
+          "type": "string"
+        }
+      }
+    },
+    "service": {
+      "type": "object",
+      "required": [
+        "port",
+        "targetPort"
+      ],
+      "properties": {
+        "type": {
+          "type": "string"
+        },
+        "port": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 65535
+        },
+        "targetPort": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 65535
+        }
+      }
+    }
+  }
+}
+```
+
+**Key rules to understand:**
+- **Explicit `required`:** In JSON Schema, specifying a property type does **not** make it required. You must list required field names in the `"required": [...]` array.
+- **Top-level properties:** Notice that `"additionalProperties": false` is omitted. This allows additional top-level keys (`extraEnv`, `resources`, `pageContent`, and future lab features) without schema errors.
+- **Port boundaries:** Restricts `port` and `targetPort` between `1` and `65535`, preventing invalid TCP port configurations.
+
+---
+
+### Step 2: Create `charts/nginx-demo/templates/tests/http.yaml`
+
+Create the directory `charts/nginx-demo/templates/tests/` and create `charts/nginx-demo/templates/tests/http.yaml`:
+
+```yaml
+apiVersion: v1
+kind: Pod
+metadata:
+  name: {{ .Release.Name }}-http-test
+  labels:
+    app.kubernetes.io/name: {{ .Chart.Name }}
+    app.kubernetes.io/instance: {{ .Release.Name }}
+    app.kubernetes.io/version: {{ .Chart.AppVersion | quote }}
+    app.kubernetes.io/managed-by: {{ .Release.Service }}
+  annotations:
+    "helm.sh/hook": test
+    "helm.sh/hook-delete-policy": before-hook-creation
+spec:
+  restartPolicy: Never
+  containers:
+    - name: http
+      image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+      command: ["wget"]
+      args:
+        - "-qO-"
+        - "--timeout=10"
+        - "http://{{ include "nginx-demo.serviceName" . }}:{{ .Values.service.port }}/"
+```
+
+**Key rules to understand:**
+- **`helm.sh/hook: test`:** Marks this Pod as an integration test hook. Helm will NOT deploy it during `helm install` or `upgrade`; it only deploys when you invoke `helm test`.
+- **`helm.sh/hook-delete-policy: before-hook-creation`:** Deletes any previous test Pod before creating a new one. This keeps test logs available for inspection via `--logs` after the test finishes (unlike `hook-succeeded`, which deletes the Pod immediately and breaks `--logs`).
+- **No selector labels:** Notice the test Pod does **not** have the selector label `app: {{ .Release.Name }}`. Test Pods must never become endpoints in the application Service!
+- **`restartPolicy: Never`:** If the test fails, the Pod must not restart in a loop.
+
+---
+
+### Step 3: Create `charts/nginx-demo/templates/NOTES.txt`
+
+Create `charts/nginx-demo/templates/NOTES.txt`. Helm displays this file to operators immediately after a release is installed or upgraded, and when running `helm status`.
+
+```text
+1. Get the application URL by running these commands:
+  kubectl --namespace {{ .Release.Namespace }} port-forward service/{{ include "nginx-demo.serviceName" . }} 8080:{{ .Values.service.port }}
+  curl http://127.0.0.1:8080
+```
+
+**Why dynamic templating matters:**
+- `{{ .Release.Namespace }}` injects the actual namespace where the release was installed.
+- `{{ include "nginx-demo.serviceName" . }}` outputs the exact Service name (`demo-dev-service`).
+- `{{ .Values.service.port }}` outputs the configured listening port.
+
+---
 
 ## Verify
+
+### 1. Test schema validation with valid values
+Run the linter against the default chart, dev profile, and prod profile:
 
 ```bash
 helm lint ./charts/nginx-demo
 helm lint ./charts/nginx-demo -f ./charts/nginx-demo/values-dev.yaml
 helm lint ./charts/nginx-demo -f ./charts/nginx-demo/values-prod.yaml
+```
+*Expect:* All three pass with `0 chart(s) failed`.
+
+### 2. Test fail-fast schema rejection with invalid values
+Test invalid negative replica count:
+```bash
 helm template demo-dev ./charts/nginx-demo --set replicaCount=-1
+```
+*Expect error:*
+```text
+Error: values don't meet the specifications of the schema(s) in the following chart(s):
+nginx-demo:
+- replicaCount: Must be greater than or equal to 0
+```
+
+Test invalid TCP port number:
+```bash
 helm template demo-dev ./charts/nginx-demo --set service.port=70000
 ```
-
-The first three should pass; the last two must fail schema validation. Then:
-
-```bash
-helm upgrade demo-dev ./charts/nginx-demo -n helm-lab --reset-values -f ./charts/nginx-demo/values-dev.yaml --wait --timeout 120s
-helm test demo-dev -n helm-lab --logs --timeout 60s
-helm status demo-dev -n helm-lab
+*Expect error:*
+```text
+Error: values don't meet the specifications of the schema(s) in the following chart(s):
+nginx-demo:
+- service.port: Must be less than or equal to 65535
 ```
 
-Expect a passing HTTP test and useful access instructions. If you include
-`hook-succeeded` in the delete policy, Helm will delete the pod immediately upon
-success, which can cause `--logs` to fail with "pod not found". Extend the test
-to check for your expected heading if you want to verify content as well as HTTP availability.
+### 3. Deploy and test the live application
+Deploy the release using dev values:
+```bash
+helm upgrade demo-dev ./charts/nginx-demo -n helm-lab --reset-values -f ./charts/nginx-demo/values-dev.yaml --wait --timeout 120s
+```
+
+Run the in-cluster HTTP test suite:
+```bash
+helm test demo-dev -n helm-lab --logs --timeout 60s
+```
+*Expect output:*
+```text
+RUNNING: demo-dev-http-test
+[demo-dev-http-test] <h1>Hello from Helm Lab</h1>
+PASSED:  demo-dev-http-test
+```
+
+Inspect release status and verify `NOTES.txt` rendering:
+```bash
+helm status demo-dev -n helm-lab
+```
+*Expect:* `NOTES:` section displays the rendered port-forward instructions with `demo-dev-service` and port `80`.
 
 ## Break it and recover
 
@@ -62,83 +211,6 @@ the application release.
 
 Keep the corrected test and schema. Remove any retained failed test Pod after
 inspection. Commit and create `lab-07-complete`.
-
-<details>
-<summary>Hint: values.schema.json</summary>
-
-```json
-{
-  "$schema": "https://json-schema.org/draft-07/schema#",
-  "title": "Values",
-  "type": "object",
-  "required": ["replicaCount", "image", "service"],
-  "properties": {
-    "replicaCount": { "type": "integer", "minimum": 0 },
-    "image": {
-      "type": "object",
-      "required": ["repository", "tag"],
-      "properties": {
-        "repository": { "type": "string", "minLength": 1 },
-        "tag": { "type": "string", "minLength": 1 },
-        "pullPolicy": { "type": "string" }
-      }
-    },
-    "service": {
-      "type": "object",
-      "required": ["port", "targetPort"],
-      "properties": {
-        "type": { "type": "string" },
-        "port": { "type": "integer", "minimum": 1, "maximum": 65535 },
-        "targetPort": { "type": "integer", "minimum": 1, "maximum": 65535 }
-      }
-    }
-  }
-}
-```
-
-</details>
-
-<details>
-<summary>Hint: test container and annotations</summary>
-
-```yaml
-apiVersion: v1
-kind: Pod
-metadata:
-  name: "{{ .Release.Name }}-http-test"
-  labels:
-    app.kubernetes.io/name: {{ .Chart.Name }}
-    app.kubernetes.io/instance: {{ .Release.Name }}
-  annotations:
-    "helm.sh/hook": test
-    "helm.sh/hook-delete-policy": before-hook-creation
-spec:
-  restartPolicy: Never
-  containers:
-    - name: http
-      image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
-      command: ["wget"]
-      args:
-        - "-qO-"
-        - "--timeout=10"
-        - "http://{{ include "nginx-demo.serviceName" . }}:{{ .Values.service.port }}/"
-```
-
-Give the test Pod a name such as `<release>-http-test`. Do not give it the
-application's selector labels: it must not become a Service endpoint.
-
-</details>
-
-<details>
-<summary>Hint: templates/NOTES.txt</summary>
-
-```text
-1. Get the application URL by running these commands:
-  kubectl --namespace {{ .Release.Namespace }} port-forward service/{{ include "nginx-demo.serviceName" . }} 8080:{{ .Values.service.port }}
-  curl http://127.0.0.1:8080
-```
-
-</details>
 
 Reference: [Chart tests](https://helm.sh/docs/v3/topics/chart_tests/).
 
