@@ -7,63 +7,128 @@ Complete A locally first. B needs an OCI registry you can publish to. C needs a
 Git remote readable by Argo CD and an existing Argo CD installation on your lab
 cluster. You can pause at these boundaries and record which parts you completed.
 
-## A. Package and install
+## Part A: Package and install
 
-1. Set the parent chart version to `0.2.0` to identify this completed learning
-   milestone. Keep `appVersion` tied to NGINX, not the lab number.
-2. Build, lint, and package:
+### Step 1: Bump chart version in `charts/nginx-demo/Chart.yaml`
+
+Open `charts/nginx-demo/Chart.yaml` and update the chart `version` to `0.2.0` to represent this packaging milestone:
+
+```yaml
+version: 0.2.0
+```
+> [!NOTE]
+> Keep `appVersion: "1.30.4"` unchanged. The chart `version` reflects the Helm template and configuration release, while `appVersion` tracks the underlying application (NGINX).
+
+---
+
+### Step 2: Build dependencies, lint, and package
+
+Run these commands to package the chart into an immutable `.tgz` artifact:
 
 ```bash
+# 1. Ensure subchart dependencies are built from Chart.lock
 helm dependency build ./charts/nginx-demo
+
+# 2. Lint chart syntax and schema
 helm lint ./charts/nginx-demo
+
+# 3. Create destination directory and package the chart
 mkdir -p dist
 helm package ./charts/nginx-demo --destination ./dist
+```
+*Expect:* Helm outputs `Successfully packaged chart and saved it to: ./dist/nginx-demo-0.2.0.tgz`.
+
+---
+
+### Step 3: Install directly from the packaged artifact
+
+Deploy the `.tgz` package directly without pointing to the uncompressed source folder:
+
+```bash
+# Inspect packaged metadata
 helm show chart ./dist/nginx-demo-0.2.0.tgz
+
+# Install release from the packaged archive
 helm install demo-package ./dist/nginx-demo-0.2.0.tgz -n helm-lab -f ./charts/nginx-demo/values-dev.yaml --wait --timeout 120s
+
+# Verify integration tests pass
 helm test demo-package -n helm-lab --timeout 60s
 ```
 
-Expect chart version `0.2.0`, a separate release, and a passing HTTP test.
+*Expect:* A separate release named `demo-package` running alongside `demo-dev` in namespace `helm-lab`, with all tests passing.
 
-**Break it:** Edit `pageContent` in the working chart and render the folder and
-archive separately. The archive must retain the packaged content. Restore the
-experimental edit; package a new chart version when you want a new artifact.
+---
 
-## B. Publish to OCI
+## Part B: Publish to an OCI Registry
 
-You can publish to either a zero-configuration local registry or an external registry.
+Helm 3 can push and pull chart archives directly to/from **OCI (Open Container Initiative) registries** using the same protocols and infrastructure as container images.
 
-### Option 1: Fast local registry (self-contained, no auth required)
+You have two options:
+
+### Option 1: Fast local registry with Docker (Recommended for labs)
+
+> [!NOTE]
+> **Why use Docker for the registry instead of running it in Kubernetes?**
+> In production, an OCI registry is an **external infrastructure service** outside the application cluster (like GHCR, AWS ECR, Harbor, or Docker Hub). Running `registry:2` in Docker provides a lightweight, local OCI registry on `localhost:5001` that requires **zero cloud accounts, zero authentication tokens, and zero ingress configuration**, while accurately simulating how Helm interacts with external registries.
+
+1. **Start the local registry container:**
+   ```bash
+   docker run -d -p 5001:5000 --name helm-registry registry:2
+   ```
+
+2. **Push the chart to the local OCI registry:**
+   ```bash
+   LAB_REGISTRY=localhost:5001
+   LAB_REGISTRY_NAMESPACE=helm-lab
+
+   helm push ./dist/nginx-demo-0.2.0.tgz "oci://$LAB_REGISTRY/$LAB_REGISTRY_NAMESPACE"
+   ```
+   *Expect output:*
+   ```text
+   Pushed: localhost:5001/helm-lab/nginx-demo:0.2.0
+   Digest: sha256:...
+   ```
+
+3. **Inspect and render directly from the OCI registry:**
+   ```bash
+   helm show chart "oci://$LAB_REGISTRY/$LAB_REGISTRY_NAMESPACE/nginx-demo" --version 0.2.0
+   helm template demo-oci "oci://$LAB_REGISTRY/$LAB_REGISTRY_NAMESPACE/nginx-demo" --version 0.2.0
+   ```
+
+---
+
+### Option 2: External OCI registry (GHCR, Harbor, Docker Hub, ECR)
+
+If you have an account on an external registry, authenticate and push:
 
 ```bash
-docker run -d -p 5001:5000 --name helm-registry registry:2
-LAB_REGISTRY=localhost:5001
-LAB_REGISTRY_NAMESPACE=helm-lab
+LAB_REGISTRY=ghcr.io
+LAB_REGISTRY_NAMESPACE=your-username
 
-helm push ./dist/nginx-demo-0.2.0.tgz "oci://$LAB_REGISTRY/$LAB_REGISTRY_NAMESPACE"
-helm show chart "oci://$LAB_REGISTRY/$LAB_REGISTRY_NAMESPACE/nginx-demo" --version 0.2.0
-helm template demo-oci "oci://$LAB_REGISTRY/$LAB_REGISTRY_NAMESPACE/nginx-demo" --version 0.2.0
-```
-
-### Option 2: External registry (GHCR, Harbor, Docker Hub, ECR, etc.)
-
-Choose a registry and namespace you control; replace the example values below:
-
-```bash
-LAB_REGISTRY=registry.example.com
-LAB_REGISTRY_NAMESPACE=your-namespace
+# Authenticate with registry
 helm registry login "$LAB_REGISTRY"
+
+# Push to OCI registry
 helm push ./dist/nginx-demo-0.2.0.tgz "oci://$LAB_REGISTRY/$LAB_REGISTRY_NAMESPACE"
+
+# Inspect and render from remote registry
 helm show chart "oci://$LAB_REGISTRY/$LAB_REGISTRY_NAMESPACE/nginx-demo" --version 0.2.0
 helm template demo-oci "oci://$LAB_REGISTRY/$LAB_REGISTRY_NAMESPACE/nginx-demo" --version 0.2.0
 ```
 
-Expect remote metadata and rendering to match the packaged chart. Publishing an
-artifact does not install a release. In Helm 3, OCI packaging replaces legacy HTTP
-chart repositories (which required hosting an `index.yaml` and running `helm repo add` /
-`helm repo update`).
+---
 
-## C. Let Git drive deployment
+## Part C: Let Git drive deployment (GitOps with Argo CD)
+
+> [!NOTE]
+> **Prerequisites for Part C:**
+> Part C requires an Argo CD instance running on your cluster and a remote Git repository (GitHub/GitLab) where your chart branch is pushed.
+> - If you want to install Argo CD locally on your cluster:
+>   ```bash
+>   kubectl create namespace argocd
+>   kubectl apply -n argocd -f https://raw.githubusercontent.com/argoproj/argo-cd/stable/manifests/install.yaml
+>   ```
+> - If you do not have Argo CD or an external Git remote configured, completing **Part A and Part B** fulfills all core Helm packaging and OCI registry learning objectives!
 
 For this exercise, Argo CD reads the chart from Git. Commit the chart, child
 source, lock file, and values file to a branch, then push that branch to your
