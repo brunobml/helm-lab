@@ -6,4 +6,4 @@ metadata:
     {{- include "nginx-demo.labels" . | nindent 4 }}
 data:
   index.html: |
-    {{- .Values.pageContent | nindent 4 }}
+    {{- tpl .Values.pageContent . | nindent 4 }}

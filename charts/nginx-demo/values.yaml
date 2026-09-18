@@ -71,3 +71,7 @@ migration:
   image: busybox:1.36
   # Set to true to make the hook fail (used in Lab 10 to observe hook failures).
   fail: false
+
+# Extra ConfigMaps rendered by the lab-common library. Map of name -> map of key/value.
+# Values may contain template expressions, for example "{{ .Release.Name }}".
+extraConfigMaps: {}

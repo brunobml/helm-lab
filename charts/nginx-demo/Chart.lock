@@ -2,5 +2,8 @@ dependencies:
 - name: lab-banner
   repository: file://../lab-banner
   version: 0.1.0
-digest: sha256:d4d690b76bbeb631d6140a107f97da6721aba3e7c3e7fc00d5a5b5361d63d781
-generated: "2026-09-15T13:50:09.230127349-06:00"
+- name: lab-common
+  repository: file://../lab-common
+  version: 0.1.0
+digest: sha256:59d8c69006dfb24ba4156b9e8dc2f311fc7287a5d918d57ea1150e60963c4652
+generated: "2026-09-18T14:32:20.727722499-06:00"

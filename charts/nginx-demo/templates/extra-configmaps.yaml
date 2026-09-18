@@ -1,0 +1,4 @@
+{{- range $name, $data := .Values.extraConfigMaps }}
+---
+{{ include "lab-common.configmap" (dict "root" $ "name" $name "data" $data) }}
+{{- end }}

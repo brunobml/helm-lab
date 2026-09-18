@@ -54,6 +54,13 @@
         }
       }
     },
+    "extraConfigMaps": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "object",
+        "minProperties": 1
+      }
+    },
     "migration": {
       "type": "object",
       "properties": {

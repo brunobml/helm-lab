@@ -1,0 +1,5 @@
+apiVersion: v2
+name: lab-common
+description: Shared named templates for the Helm Lab charts
+type: library
+version: 0.1.0

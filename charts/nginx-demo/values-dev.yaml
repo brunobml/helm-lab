@@ -12,7 +12,15 @@ resources:
     memory: 128Mi
 
 pageContent: |
-  <h1>Hello from Updated Helm Lab</h1>
+  <h1>Hello from {{ .Release.Name }} in {{ .Values.global.environment }}</h1>
+
+extraConfigMaps:
+  settings:
+    ENVIRONMENT: "{{ .Values.global.environment }}"
+    RELEASE: "{{ .Release.Name }}"
+    MAX_CONN: 100
+  feature-flags:
+    beta: "false"
 
 global:
   environment: dev
