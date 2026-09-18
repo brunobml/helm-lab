@@ -1,0 +1,81 @@
+{{- if .Values.migration.enabled }}
+{{- $db := printf "%s-db" .Release.Name }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ .Release.Name }}-migrations
+  labels:
+    {{- include "shop.labels" . | nindent 4 }}
+  annotations:
+    "helm.sh/hook": post-install,post-upgrade
+    "helm.sh/hook-weight": "-5"
+    "helm.sh/hook-delete-policy": before-hook-creation,hook-succeeded
+data:
+  001-init.sql: |
+    CREATE TABLE IF NOT EXISTS items (
+      id serial PRIMARY KEY,
+      name text NOT NULL UNIQUE
+    );
+    {{- range .Values.migration.seed }}
+    INSERT INTO items (name) VALUES ({{ . | replace "'" "''" | squote }}) ON CONFLICT (name) DO NOTHING;
+    {{- end }}
+    DO $$
+    BEGIN
+      IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname = '{{ .Values.api.anonRole }}') THEN
+        CREATE ROLE {{ .Values.api.anonRole }} NOLOGIN;
+      END IF;
+    END
+    $$;
+    GRANT USAGE ON SCHEMA public TO {{ .Values.api.anonRole }};
+    GRANT SELECT ON items TO {{ .Values.api.anonRole }};
+    GRANT {{ .Values.api.anonRole }} TO {{ .Values.db.user }};
+    {{- with .Values.migration.extraSQL }}
+    {{ . | nindent 4 }}
+    {{- end }}
+    NOTIFY pgrst, 'reload schema';
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ .Release.Name }}-migrate
+  labels:
+    {{- include "shop.labels" . | nindent 4 }}
+  annotations:
+    "helm.sh/hook": post-install,post-upgrade
+    "helm.sh/hook-weight": "0"
+    "helm.sh/hook-delete-policy": before-hook-creation,hook-succeeded
+spec:
+  backoffLimit: 0
+  activeDeadlineSeconds: 120
+  template:
+    metadata:
+      labels:
+        {{- include "shop.labels" . | nindent 8 }}
+    spec:
+      restartPolicy: Never
+      containers:
+        - name: migrate
+          image: "{{ .Values.db.image.repository }}:{{ .Values.db.image.tag }}"
+          command: ["sh", "-c"]
+          args:
+            - |
+              set -e
+              until pg_isready -h {{ $db }} -U {{ .Values.db.user }} -d {{ .Values.db.database }}; do
+                echo "waiting for database"; sleep 2
+              done
+              psql -v ON_ERROR_STOP=1 -h {{ $db }} -U {{ .Values.db.user }} -d {{ .Values.db.database }} -f /migrations/001-init.sql
+              echo "migration complete"
+          env:
+            - name: PGPASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "shop.credentialsSecret" . }}
+                  key: POSTGRES_PASSWORD
+          volumeMounts:
+            - name: migrations
+              mountPath: /migrations
+      volumes:
+        - name: migrations
+          configMap:
+            name: {{ .Release.Name }}-migrations
+{{- end }}

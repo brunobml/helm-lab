@@ -1,0 +1,37 @@
+global:
+  environment: dev
+
+# Credentials Secret shared by db, api, and the migration hook. The password is
+# supplied from an encrypted secrets.<env>.yaml file (see Lab 13); never commit it in plaintext.
+# Set create=false to provide a Secret named "<release>-credentials" yourself
+# (keys: POSTGRES_PASSWORD, PGRST_DB_URI), for example under GitOps.
+credentials:
+  create: true
+  dbPassword: ""
+
+# Hook that creates the schema and seeds data after the database is up.
+migration:
+  enabled: true
+  seed:
+    - first item
+  # Extra SQL appended to the migration. Set to invalid SQL in Lab 13 to see a failed hook.
+  extraSQL: ""
+
+# ----- subchart overrides (keys are the dependency aliases) -----
+web:
+  replicaCount: 1
+  lab-banner:
+    enabled: false
+  migration:
+    enabled: false
+  pageContent: |
+    <h1>Shop ({{ .Values.global.environment }})</h1>
+
+api:
+  replicaCount: 1
+
+db:
+  database: shop
+  user: shop
+  persistence:
+    enabled: false

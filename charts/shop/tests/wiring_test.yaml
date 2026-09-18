@@ -1,0 +1,49 @@
+suite: subchart wiring
+templates:
+  - charts/db/templates/statefulset.yaml
+  - charts/api/templates/deployment.yaml
+  - charts/web/templates/service.yaml
+release:
+  name: shop
+set:
+  credentials.dbPassword: pw
+tests:
+  - it: db and api read the credentials Secret the umbrella creates
+    template: charts/db/templates/statefulset.yaml
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].env[2].valueFrom.secretKeyRef.name
+          value: shop-credentials
+
+  - it: api reads the connection string from the same Secret
+    template: charts/api/templates/deployment.yaml
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].env[0].valueFrom.secretKeyRef.name
+          value: shop-credentials
+
+  - it: web Service selector cannot match api or db pods
+    template: charts/web/templates/service.yaml
+    asserts:
+      - equal:
+          path: spec.selector
+          value:
+            app: shop
+      - notExists:
+          path: spec.selector["app.kubernetes.io/component"]
+
+  - it: api and db pods do not carry the web selector label
+    template: charts/api/templates/deployment.yaml
+    asserts:
+      - notExists:
+          path: spec.template.metadata.labels.app
+
+  - it: db uses a persistent volume claim only when persistence is enabled
+    template: charts/db/templates/statefulset.yaml
+    set:
+      db.persistence.enabled: true
+    asserts:
+      - exists:
+          path: spec.volumeClaimTemplates
+      - notExists:
+          path: spec.template.spec.volumes

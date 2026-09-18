@@ -1,0 +1,15 @@
+replicaCount: 1
+
+image:
+  repository: postgrest/postgrest
+  tag: v12.2.3
+  pullPolicy: IfNotPresent
+
+# Schema exposed by PostgREST and the role it switches to for requests.
+dbSchema: public
+anonRole: web_anon
+
+service:
+  port: 3000
+
+resources: {}

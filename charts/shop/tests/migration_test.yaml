@@ -1,0 +1,67 @@
+suite: migration hook
+templates:
+  - templates/migration-job.yaml
+tests:
+  - it: runs after install and upgrade, ConfigMap before Job
+    documentSelector:
+      path: kind
+      value: ConfigMap
+    asserts:
+      - equal:
+          path: metadata.annotations["helm.sh/hook"]
+          value: post-install,post-upgrade
+      - equal:
+          path: metadata.annotations["helm.sh/hook-weight"]
+          value: "-5"
+
+  - it: runs the Job at weight 0 and cleans up after success
+    documentSelector:
+      path: kind
+      value: Job
+    asserts:
+      - equal:
+          path: metadata.annotations["helm.sh/hook"]
+          value: post-install,post-upgrade
+      - equal:
+          path: metadata.annotations["helm.sh/hook-weight"]
+          value: "0"
+      - equal:
+          path: metadata.annotations["helm.sh/hook-delete-policy"]
+          value: before-hook-creation,hook-succeeded
+      - equal:
+          path: spec.backoffLimit
+          value: 0
+
+  - it: seeds one INSERT per item and escapes quotes
+    documentSelector:
+      path: kind
+      value: ConfigMap
+    set:
+      migration.seed:
+        - first item
+        - "it's second"
+    asserts:
+      - matchRegex:
+          path: data["001-init.sql"]
+          pattern: "VALUES \\('first item'\\)"
+      - matchRegex:
+          path: data["001-init.sql"]
+          pattern: "VALUES \\('it''s second'\\)"
+
+  - it: appends extra SQL before the reload notification
+    documentSelector:
+      path: kind
+      value: ConfigMap
+    set:
+      migration.extraSQL: "SELECT 1;"
+    asserts:
+      - matchRegex:
+          path: data["001-init.sql"]
+          pattern: "SELECT 1;\\s+NOTIFY pgrst"
+
+  - it: is not rendered when disabled
+    set:
+      migration.enabled: false
+    asserts:
+      - hasDocuments:
+          count: 0

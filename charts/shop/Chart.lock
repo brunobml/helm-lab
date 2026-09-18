@@ -1,0 +1,12 @@
+dependencies:
+- name: nginx-demo
+  repository: file://../nginx-demo
+  version: 0.5.0
+- name: shop-api
+  repository: file://../shop-api
+  version: 0.1.0
+- name: shop-db
+  repository: file://../shop-db
+  version: 0.1.0
+digest: sha256:79dc8ea5647cc170bdbe48d3f37788ff3f9ed03191f3592a979fc18fc8cd31be
+generated: "2026-09-18T15:01:20.440519539-06:00"

@@ -1,0 +1,64 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "shop-api.name" . }}
+  labels:
+    {{- include "shop-api.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.replicaCount }}
+  selector:
+    matchLabels:
+      {{- include "shop-api.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "shop-api.labels" . | nindent 8 }}
+    spec:
+      containers:
+        - name: postgrest
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          env:
+            - name: PGRST_DB_URI
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "shop-api.credentialsSecret" . }}
+                  key: PGRST_DB_URI
+            - name: PGRST_DB_SCHEMAS
+              value: {{ .Values.dbSchema | quote }}
+            - name: PGRST_DB_ANON_ROLE
+              value: {{ .Values.anonRole | quote }}
+            - name: PGRST_SERVER_PORT
+              value: {{ .Values.service.port | quote }}
+            - name: PGRST_ADMIN_SERVER_PORT
+              value: "3001"
+          ports:
+            - name: http
+              containerPort: {{ .Values.service.port }}
+            - name: admin
+              containerPort: 3001
+          # /ready is 503 while the database is unreachable. After a database restart it can stay
+          # 503 (the notification listener does not always recover), so liveness also uses /ready:
+          # a stuck pod is restarted and reconnects. The startup probe gives a fresh install time
+          # to wait for the database before liveness begins.
+          startupProbe:
+            httpGet:
+              path: /ready
+              port: admin
+            periodSeconds: 5
+            failureThreshold: 30
+          readinessProbe:
+            httpGet:
+              path: /ready
+              port: admin
+            periodSeconds: 3
+          livenessProbe:
+            httpGet:
+              path: /ready
+              port: admin
+            periodSeconds: 10
+            failureThreshold: 6
+          {{- with .Values.resources }}
+          resources:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}

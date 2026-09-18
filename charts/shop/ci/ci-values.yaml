@@ -1,0 +1,3 @@
+# Dummy password for CI only; real ones come from encrypted files.
+credentials:
+  dbPassword: ci-only-password

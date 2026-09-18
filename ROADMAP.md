@@ -14,13 +14,13 @@ executed on a real cluster before it is committed, and findings go into
 | Authoring | 4-7: template logic, helpers, ConfigMaps/rollouts, validation and tests | Can write a correct single chart |
 | Composition and delivery | 8-9: dependencies, packaging, OCI, GitOps | Can ship a chart |
 | Operating and hardening | 10-12: hooks and recovery, advanced templating and library charts, secrets/signing/CI | Can run charts in a team pipeline |
-| **Integration** | **13: capstone (this milestone)** | **Can design and operate a multi-service release end to end** |
+| Integration | 13: capstone (done) | Can design and operate a multi-service release end to end |
 | Advanced track | 14-18 (below) | Can consume, harden, and evolve charts at scale |
 
 Kubernetes-focused extensions (networking, health and scaling, identity and secrets, storage)
 stay optional and are referenced by the labs that need them.
 
-## Next: Lab 13, Capstone: an umbrella chart for a three-tier app
+## Done: Lab 13, Capstone: an umbrella chart for a three-tier app
 
 **Goal:** apply Labs 0-12 together, with no new Helm concepts, so gaps show up.
 
@@ -126,5 +126,6 @@ A learner can claim working mastery when they can do each of these without notes
 ## Known gaps in the current material
 
 - The Argo CD steps (Lab 9 Part C, Lab 12 workflow, Lab 13 GitOps) were not executed against a live Argo CD or GitHub.
+- The capstone layout (nested `file://` dependencies) cannot be built by Argo CD from Git alone; Lab 17 covers publishing subcharts to a registry.
 - All labs target Helm 3.19; Helm 4 differences are only planned (Lab 18).
 - Cluster checks used a single-node k3d/kind cluster; multi-node scheduling behavior is untested.

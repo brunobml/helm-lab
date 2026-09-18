@@ -35,13 +35,15 @@ jobs:
           done
           exit $bad
 
-      - name: Build chart dependencies
-        run: helm dependency build charts/nginx-demo
+      - name: Build chart dependencies (nginx-demo first: shop packages it)
+        run: |
+          helm dependency build charts/nginx-demo
+          helm dependency build charts/shop
 
       - name: Unit tests
         run: |
           helm plugin install https://github.com/helm-unittest/helm-unittest
-          helm unittest charts/nginx-demo
+          helm unittest charts/nginx-demo charts/shop
 
       - name: Lint
         run: ct lint --config ct.yaml

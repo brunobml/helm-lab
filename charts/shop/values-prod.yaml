@@ -1,0 +1,30 @@
+global:
+  environment: prod
+
+migration:
+  seed:
+    - first item
+    - second item
+
+web:
+  replicaCount: 2
+  resources:
+    requests:
+      cpu: 50m
+      memory: 32Mi
+
+api:
+  replicaCount: 2
+  resources:
+    requests:
+      cpu: 50m
+      memory: 64Mi
+
+db:
+  persistence:
+    enabled: true
+    size: 1Gi
+  resources:
+    requests:
+      cpu: 100m
+      memory: 128Mi

@@ -1,0 +1,16 @@
+image:
+  repository: postgres
+  tag: 16-alpine
+  pullPolicy: IfNotPresent
+
+# Database and role created on first start. The password comes from the
+# "<release>-credentials" Secret (key POSTGRES_PASSWORD), never from values.
+database: shop
+user: shop
+
+persistence:
+  enabled: false
+  size: 1Gi
+  storageClass: ""
+
+resources: {}

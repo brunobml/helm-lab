@@ -1,0 +1,13 @@
+Release {{ .Release.Name }} ({{ .Values.global.environment }}) installed in {{ .Release.Namespace }}.
+
+Tiers:
+  web  {{ .Release.Name }}-service   (nginx)
+  api  {{ .Release.Name }}-api       (PostgREST on port {{ .Values.api.service.port }})
+  db   {{ .Release.Name }}-db        (PostgreSQL, persistence {{ ternary "on" "off" .Values.db.persistence.enabled }})
+
+Try it:
+  kubectl -n {{ .Release.Namespace }} port-forward service/{{ .Release.Name }}-api 3000:{{ .Values.api.service.port }}
+  curl http://127.0.0.1:3000/items
+
+Verify all three tiers:
+  helm test {{ .Release.Name }} -n {{ .Release.Namespace }}
