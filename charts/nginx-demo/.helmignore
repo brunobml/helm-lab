@@ -21,3 +21,7 @@
 .idea/
 *.tmproj
 .vscode/
+/tests/
+/secrets.*.yaml
+/.sops.yaml
+/ci/

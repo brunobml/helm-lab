@@ -1,0 +1,16 @@
+suite: helm test hook
+templates:
+  - templates/tests/http.yaml
+tests:
+  - it: is a test hook Pod that calls the Service
+    release:
+      name: shop
+    asserts:
+      - isKind:
+          of: Pod
+      - equal:
+          path: metadata.annotations["helm.sh/hook"]
+          value: test
+      - matchRegex:
+          path: spec.containers[0].args[2]
+          pattern: http://shop-service:80/

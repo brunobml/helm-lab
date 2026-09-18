@@ -75,3 +75,9 @@ migration:
 # Extra ConfigMaps rendered by the lab-common library. Map of name -> map of key/value.
 # Values may contain template expressions, for example "{{ .Release.Name }}".
 extraConfigMaps: {}
+
+# Secret created by this chart. Supply secret.data from an encrypted values file
+# (Lab 12); never commit plaintext secret values. Mutually exclusive with existingSecret.
+secret:
+  create: false
+  data: {}

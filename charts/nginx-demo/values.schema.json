@@ -61,6 +61,17 @@
         "minProperties": 1
       }
     },
+    "secret": {
+      "type": "object",
+      "properties": {
+        "create": {
+          "type": "boolean"
+        },
+        "data": {
+          "type": "object"
+        }
+      }
+    },
     "migration": {
       "type": "object",
       "properties": {

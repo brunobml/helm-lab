@@ -10,3 +10,9 @@
 # OS files
 .DS_Store
 Thumbs.db
+
+# Decrypted secrets and private keys must never be committed
+*.dec
+*.dec.yaml
+age-keys.txt
+keys.txt

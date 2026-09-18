@@ -15,6 +15,9 @@ spec:
     metadata:
       annotations:
         checksum/config: {{ include (print $.Template.BasePath "/configmap.yaml") . | sha256sum }}
+        {{- if .Values.secret.create }}
+        checksum/secret: {{ include (print $.Template.BasePath "/secret.yaml") . | sha256sum }}
+        {{- end }}
       labels:
         {{- include "nginx-demo.labels" . | nindent 8 }}
     spec:
@@ -23,10 +26,10 @@ spec:
         - name: nginx
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
           imagePullPolicy: {{ .Values.image.pullPolicy }}
-          {{- if .Values.existingSecret }}
+          {{- with (include "nginx-demo.envSecretName" .) }}
           envFrom:
             - secretRef:
-                name: {{ .Values.existingSecret }}
+                name: {{ . }}
           {{- end }}
           ports:
             # Declares the image's default port; it does not configure the server.

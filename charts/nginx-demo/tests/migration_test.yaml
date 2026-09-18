@@ -1,0 +1,35 @@
+suite: migration hook
+templates:
+  - templates/migration-job.yaml
+tests:
+  - it: is a pre-install and pre-upgrade hook that cleans up after itself
+    asserts:
+      - isKind:
+          of: Job
+      - equal:
+          path: metadata.annotations["helm.sh/hook"]
+          value: pre-install,pre-upgrade
+      - equal:
+          path: metadata.annotations["helm.sh/hook-delete-policy"]
+          value: before-hook-creation,hook-succeeded
+
+  - it: is not rendered when disabled
+    set:
+      migration.enabled: false
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  - it: exits non-zero only when migration.fail is set
+    set:
+      migration.fail: true
+    asserts:
+      - matchRegex:
+          path: spec.template.spec.containers[0].args[0]
+          pattern: exit 1
+
+  - it: does not fail by default
+    asserts:
+      - notMatchRegex:
+          path: spec.template.spec.containers[0].args[0]
+          pattern: exit 1

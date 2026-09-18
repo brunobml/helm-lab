@@ -33,3 +33,16 @@ Service account name
     {{- default "default" .Values.serviceAccount.name -}}
 {{- end -}}
 {{- end -}}
+
+{{/*
+Secret name used for envFrom: an existing Secret, or the one this chart creates.
+*/}}
+{{- define "nginx-demo.envSecretName" -}}
+{{- if and .Values.existingSecret .Values.secret.create -}}
+  {{- fail "set either existingSecret or secret.create, not both" -}}
+{{- else if .Values.existingSecret -}}
+  {{- .Values.existingSecret -}}
+{{- else if .Values.secret.create -}}
+  {{- printf "%s-secret" .Release.Name | trunc 63 | trimSuffix "-" -}}
+{{- end -}}
+{{- end -}}
