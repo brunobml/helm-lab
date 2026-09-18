@@ -1,0 +1,26 @@
+# replicaCount controls how many NGINX Pods the Deployment runs.
+replicaCount: 1
+
+image:
+  repository: nginx
+  tag: "1.30.4-alpine"
+  pullPolicy: IfNotPresent
+
+service:
+  type: ClusterIP
+  port: 80
+  targetPort: 80
+
+extraEnv:
+  LAB_NAME: dev
+  FEATURE_ENABLED: "false"
+
+resources:
+  requests:
+    cpu: 50m
+    memory: 32Mi
+  limits:
+    memory: 128Mi
+
+global:
+  environment: dev

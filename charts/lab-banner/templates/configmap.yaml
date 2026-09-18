@@ -1,0 +1,8 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ .Release.Name }}-banner
+data:
+  message: {{ .Values.message | quote }}
+  environment: {{ .Values.global.environment | default "local" | quote }}
+

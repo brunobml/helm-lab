@@ -10,3 +10,18 @@ service:
   type: ClusterIP
   port: 80
   targetPort: 80
+
+extraEnv: {}
+
+resources: {}
+
+pageContent: |
+  <h1>Hello from Updated Helm Lab</h1>
+  <p>I changed this page with helm upgrade.</p>
+
+lab-banner:
+      enabled: true
+      message: Hello from the parent
+
+global:
+  environment: local

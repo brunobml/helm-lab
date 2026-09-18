@@ -1,0 +1,6 @@
+dependencies:
+- name: lab-banner
+  repository: file://../lab-banner
+  version: 0.1.0
+digest: sha256:d4d690b76bbeb631d6140a107f97da6721aba3e7c3e7fc00d5a5b5361d63d781
+generated: "2026-09-18T01:00:57.192297098-06:00"

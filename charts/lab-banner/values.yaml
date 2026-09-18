@@ -1,0 +1,7 @@
+lab-banner:
+  enabled: true
+  message: Hello from the parent
+
+global:
+  environment: local
+

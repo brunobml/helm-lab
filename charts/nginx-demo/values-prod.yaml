@@ -1,0 +1,12 @@
+# replicaCount controls how many NGINX Pods the Deployment runs.
+replicaCount: 3
+
+image:
+  repository: nginx
+  tag: "1.30.4-alpine"
+  pullPolicy: IfNotPresent
+
+service:
+  type: ClusterIP
+  port: 80
+  targetPort: 80
