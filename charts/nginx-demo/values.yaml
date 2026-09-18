@@ -64,3 +64,10 @@ rbac:
   create: false
 
 existingSecret: ""
+
+# Pre-install/pre-upgrade hook Job that simulates a database migration.
+migration:
+  enabled: true
+  image: busybox:1.36
+  # Set to true to make the hook fail (used in Lab 10 to observe hook failures).
+  fail: false

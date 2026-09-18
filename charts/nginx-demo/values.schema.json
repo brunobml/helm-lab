@@ -53,6 +53,21 @@
           "maximum": 65535
         }
       }
+    },
+    "migration": {
+      "type": "object",
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "image": {
+          "type": "string",
+          "minLength": 1
+        },
+        "fail": {
+          "type": "boolean"
+        }
+      }
     }
   }
 }

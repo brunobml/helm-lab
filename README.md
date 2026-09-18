@@ -80,6 +80,7 @@ If you already completed the original fundamentals, use Labs 0–3 as a short re
 - [ ] [7. Validation and tests](labs/07-validation-and-tests.md) — catch invalid inputs and test HTTP
 - [ ] [8. Dependencies](labs/08-dependencies.md) — compose charts and lock versions
 - [ ] [9. Packaging and GitOps](labs/09-packaging-and-gitops.md) — distribute and reconcile the chart
+- [ ] [10. Hooks and failure recovery](labs/10-hooks-and-failure-recovery.md) — lifecycle hooks, `--atomic`, diffing, and stuck releases
 
 Optional extensions after Lab 7:
 
@@ -106,6 +107,7 @@ This repository includes prebuilt, cluster-verified reference tags for every mil
 | `lab-07-complete` | Lab 7: Validation (`values.schema.json`), test hooks (`tests/http.yaml`), and `NOTES.txt` |
 | `lab-08-complete` | Lab 8: Dependencies (subchart `lab-banner`, `Chart.lock`, global values) |
 | `lab-09-complete` | Lab 9: Packaging (`0.2.0`), OCI registry publishing, and GitOps |
+| `lab-10-complete` | Lab 10: `pre-install,pre-upgrade` migration hook Job, chart `0.3.0` |
 | `extension-networking-complete` | Extension: Ingress and NodePort configuration |
 | `extension-health-complete` | Extension: Health probes and HorizontalPodAutoscaler (HPA v2) |
 | `extension-identity-complete` | Extension: ServiceAccount, RBAC Role/RoleBinding, and external Secrets |
@@ -125,7 +127,7 @@ Work inside this repository without modifying `main` or losing reference solutio
    ```bash
    git checkout -b my-learning lab-00-start
    ```
-2. Follow the lab instructions in `labs/01-first-chart.md` through `labs/09-packaging-and-gitops.md`.
+2. Follow the lab instructions in `labs/01-first-chart.md` through `labs/10-hooks-and-failure-recovery.md`.
 3. Test commands against your cluster and commit your progress as you complete each lab:
    ```bash
    git commit -am "Complete my lab 1"
