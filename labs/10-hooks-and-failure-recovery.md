@@ -85,17 +85,24 @@ migration:
 
 ### Step 4: Extend `charts/nginx-demo/values.schema.json`
 
-Add a `migration` entry inside the top-level `properties` object (next to `service`):
+Add a `migration` entry inside the top-level `properties` object. Notice the comma `,` added after `"service": { ... }`:
 
 ```json
-"migration": {
-  "type": "object",
-  "properties": {
-    "enabled": { "type": "boolean" },
-    "image": { "type": "string", "minLength": 1 },
-    "fail": { "type": "boolean" }
-  }
-}
+    "service": {
+      "type": "object",
+      "properties": {
+        "type": { "type": "string", "enum": ["ClusterIP", "NodePort", "LoadBalancer"] },
+        "port": { "type": "integer", "minimum": 1, "maximum": 65535 }
+      }
+    },
+    "migration": {
+      "type": "object",
+      "properties": {
+        "enabled": { "type": "boolean" },
+        "image": { "type": "string", "minLength": 1 },
+        "fail": { "type": "boolean" }
+      }
+    }
 ```
 
 ### Step 5: Bump the chart version in `charts/nginx-demo/Chart.yaml`
@@ -105,6 +112,8 @@ version: 0.3.0
 ```
 
 ### Step 6: Render and install
+
+If `helm lint` warns that the subchart dependency `lab-banner` is missing, build it first with `helm dependency build ./charts/nginx-demo`.
 
 ```bash
 helm lint ./charts/nginx-demo
@@ -210,9 +219,12 @@ helm template demo-hooks ./charts/nginx-demo -n helm-lab \
 
 ### 3. What will change? (`helm diff`)
 
-`helm diff` is a plugin. Install it once:
+`helm diff` is a plugin. Check if it is already installed, and install it if missing:
 
 ```bash
+helm plugin list
+
+# If diff is not listed, install it:
 helm plugin install https://github.com/databus23/helm-diff
 ```
 
@@ -249,7 +261,7 @@ helm upgrade demo-hooks ./charts/nginx-demo -n helm-lab -f ./charts/nginx-demo/v
 
 *Expect:* `Error: UPGRADE FAILED: another operation (install/upgrade/rollback) is in progress`.
 
-Recover by rolling back to the last good revision (use the number from `helm history`):
+Recover by rolling back to the last good revision (look at `helm history` and pick the latest revision marked `deployed`, e.g. `5`):
 
 ```bash
 helm rollback demo-hooks <last-deployed-revision> -n helm-lab --wait --timeout 60s
@@ -268,7 +280,7 @@ Local:
 ```bash
 helm lint ./charts/nginx-demo
 helm template demo-hooks ./charts/nginx-demo | grep -c "kind: Job"                                # 1
-helm template demo-hooks ./charts/nginx-demo --set migration.enabled=false | grep -c "kind: Job"   # 0
+helm template demo-hooks ./charts/nginx-demo --set migration.enabled=false | grep -c "kind: Job" || true   # 0 (Note: grep exits with code 1 when 0 matches are found)
 helm template demo-hooks ./charts/nginx-demo --set migration.fail=1 2>&1 | grep "got number"
 ```
 

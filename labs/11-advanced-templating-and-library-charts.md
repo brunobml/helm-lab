@@ -240,9 +240,14 @@ Files starting with `_` are never rendered as manifests; they only hold `define`
 
 ### Step 8: Depend on it from `nginx-demo`
 
-Append to `dependencies` in `charts/nginx-demo/Chart.yaml`:
+Append `lab-common` to `dependencies` in `charts/nginx-demo/Chart.yaml`:
 
 ```yaml
+dependencies:
+  - name: lab-banner
+    version: 0.1.0
+    repository: file://../lab-banner
+    condition: lab-banner.enabled
   - name: lab-common
     version: 0.1.0
     repository: file://../lab-common
@@ -307,16 +312,24 @@ extraConfigMaps:
     beta: "false"
 ```
 
-Add to the top-level `properties` in `charts/nginx-demo/values.schema.json`:
+Add to the top-level `properties` in `charts/nginx-demo/values.schema.json`. Notice the comma `,` added after `"migration": { ... }`:
 
 ```json
-"extraConfigMaps": {
-  "type": "object",
-  "additionalProperties": {
-    "type": "object",
-    "minProperties": 1
-  }
-}
+    "migration": {
+      "type": "object",
+      "properties": {
+        "enabled": { "type": "boolean" },
+        "image": { "type": "string", "minLength": 1 },
+        "fail": { "type": "boolean" }
+      }
+    },
+    "extraConfigMaps": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "object",
+        "minProperties": 1
+      }
+    }
 ```
 
 ### Step 11: Render and deploy
@@ -344,7 +357,7 @@ Local:
 ```bash
 helm dependency build ./charts/nginx-demo
 helm lint ./charts/nginx-demo -f ./charts/nginx-demo/values-dev.yaml
-helm template demo-dev ./charts/nginx-demo -f ./charts/nginx-demo/values-dev.yaml | grep -c "kind: ConfigMap"   # 4
+helm template demo-dev ./charts/nginx-demo -f ./charts/nginx-demo/values-dev.yaml | grep -c "kind: ConfigMap"   # 4 (page, banner, settings, feature-flags)
 helm install x ./charts/lab-common --dry-run 2>&1 | tail -1     # library charts are not installable
 ```
 

@@ -100,3 +100,139 @@ Anywhere rendering happens without a live API connection: `helm template`, `--dr
 - `include ... | nindent` for blocks; `template` cannot be piped.
 - A library chart's `templates/` files must start with `_` unless you truly want them rendered; only `define` blocks belong there.
 - Helm packages dependencies into `charts/` as `.tgz`, which is git-ignored. After a fresh clone run `helm dependency build`.
+
+---
+
+## Break It and Recover — Detailed Walkthrough
+
+Lab 11 covers three templating and validation failure modes. Perform each using a temporary scratch values file (`/tmp/bad.yaml`) with `-f` so you do not modify `values-dev.yaml`.
+
+### Scenario 1: A `tpl` Expression on a Missing Key
+
+#### 1. What to Break
+Pass a template expression in values that attempts to access a nested property (`.Values.team.name`) on a non-existent parent (`team` is not defined in `values.yaml`):
+
+`/tmp/bad.yaml`:
+```yaml
+extraConfigMaps:
+  settings:
+    OWNER: "{{ .Values.team.name }}"
+```
+
+#### 2. Run the Command
+```bash
+helm template d ./charts/nginx-demo -f /tmp/bad.yaml
+```
+
+#### 3. The Error Observed
+```text
+Error: ... executing "gotpl" at <.Values.team.name>: nil pointer evaluating interface {}.name
+```
+
+#### 4. Why This Failed
+- When `tpl` evaluates `"{{ .Values.team.name }}"`, it looks up `.Values.team`. Because `team` is not defined in `values.yaml` or `/tmp/bad.yaml`, it evaluates to `nil`.
+- Evaluating `.name` on `nil` triggers a Go template nil-pointer evaluation error.
+- Note that this is **not** a `required` validation failure. Go templates panic before any validation logic can run because an uninstantiated map was traversed.
+
+#### 5. How to Recover
+There are two ways to resolve this:
+1. **Define the parent key:** Add `team: { name: "Platform" }` to `values.yaml`.
+2. **Defensive templating (recommended for optional values):** Guard against missing maps using `default dict` and `dig`:
+   ```yaml
+   extraConfigMaps:
+     settings:
+       OWNER: '{{ .Values.team | default dict | dig "name" "unassigned" }}'
+   ```
+   Test rendering:
+   ```bash
+   helm template d ./charts/nginx-demo -f /tmp/bad.yaml --show-only templates/extra-configmaps.yaml
+   ```
+   *Output:* `OWNER: "unassigned"` renders cleanly without errors.
+
+---
+
+### Scenario 2: An Empty ConfigMap (`minProperties` vs Library `fail` Guard)
+
+#### 1. What to Break
+Supply an empty ConfigMap map under `extraConfigMaps`:
+```bash
+helm template d ./charts/nginx-demo --set-json 'extraConfigMaps={"empty":{}}'
+```
+
+#### 2. The Error Observed
+First, schema validation halts the render:
+```text
+Error: values don't meet the specifications of the schema(s) in the following chart(s):
+nginx-demo:
+- at '/extraConfigMaps/empty': minProperties: got 0, want 1
+```
+
+Now bypass schema validation to test the library chart's internal guard:
+```bash
+helm template d ./charts/nginx-demo --set-json 'extraConfigMaps={"empty":{}}' --skip-schema-validation
+```
+*Output:*
+```text
+Error: execution error at (nginx-demo/templates/extra-configmaps.yaml:3:3): lab-common.configmap: "empty" needs at least one key under 'data'
+```
+
+#### 3. Why This Failed & Defense in Depth
+- **Layer 1 (Schema):** `values.schema.json` defined `"minProperties": 1` for each object under `extraConfigMaps`. This is caught immediately at render/lint time with no templates evaluated.
+- **Layer 2 (Library Guard):** If schema validation is bypassed or if another chart uses `lab-common` without a schema, `_configmap.tpl` contains an explicit check:
+  ```yaml
+  {{- if not $data -}}
+    {{- fail (printf "lab-common.configmap: %q needs at least one key under 'data'" $name) -}}
+  {{- end -}}
+  ```
+  Why not use `required` here? In Go templates, `required` only checks if a value is `nil` or empty string `""`. An empty dictionary `dict` passes `required`! If you used `required` instead of `fail`, Helm would render an invalid Kubernetes ConfigMap with empty `data:`:
+  ```yaml
+  apiVersion: v1
+  kind: ConfigMap
+  metadata:
+    name: d-empty
+  data:
+  ```
+  `fail` guarantees that the template aborts with an actionable message.
+
+#### 4. How to Recover
+Provide at least one key-value pair for the ConfigMap, or remove the empty map.
+
+---
+
+### Scenario 3: Wrong Value Type in `extraConfigMaps`
+
+#### 1. What to Break
+Pass a scalar number instead of an object map:
+```bash
+helm template d ./charts/nginx-demo --set extraConfigMaps.settings=1
+```
+
+#### 2. The Error Observed
+```text
+Error: values don't meet the specifications of the schema(s) in the following chart(s):
+nginx-demo:
+- at '/extraConfigMaps/settings': got number, want object
+```
+
+#### 3. Why This Failed
+- `values.schema.json` defines `extraConfigMaps` as an object of objects (`"additionalProperties": { "type": "object" }`).
+- Setting it to an integer violates the schema contract and Helm rejects it before attempting template rendering.
+
+#### 4. How to Recover
+Supply a valid map of key-value pairs (or YAML object). Clean up any temporary files:
+```bash
+rm -f /tmp/bad.yaml
+```
+
+---
+
+## Key Takeaways
+
+| Concept | Key Point |
+| :--- | :--- |
+| `tpl` Function | Evaluates a string from values as a template; must be given a valid scope context (`.` or `$`). |
+| Nil Pointer vs `required` | Accessing `.Values.missing.key` panics with a nil pointer. Use `dig` or `default dict` for safe traversal. |
+| Library Charts (`type: library`) | Contain only named templates in `_*.tpl` files; cannot be installed on their own. |
+| Dict Arguments for Helpers | Named templates accept a single argument; use `dict "root" $ ...` to pass both root context and custom parameters. |
+| Selector Label Immutability | Never refactor `selectorLabels` on existing deployments; only refactor standard metadata labels (`labels`). |
+| `lookup` Function | Only works when connected to a live cluster. Returns empty in `helm template` and GitOps engines (Argo CD). |
