@@ -14,3 +14,7 @@ persistence:
   storageClass: ""
 
 resources: {}
+
+secret:
+  create: false
+  password: ""

@@ -1,0 +1,65 @@
+environments:
+  default:
+    values:
+      - environments/dev.yaml
+  dev:
+    values:
+      - environments/dev.yaml
+  prod:
+    values:
+      - environments/prod.yaml
+
+---
+
+repositories:
+  - name: podinfo
+    url: https://stefanprodan.github.io/podinfo
+
+releases:
+  - name: backend-db
+    namespace: {{ .Values.namespace }}
+    createNamespace: true
+    chart: ../charts/shop-db
+    labels:
+      tier: backend
+      component: database
+    values:
+      - values/db.yaml.gotmpl
+
+  - name: backend-api
+    namespace: {{ .Values.namespace }}
+    createNamespace: true
+    chart: ../charts/shop-api
+    needs:
+      - {{ .Values.namespace }}/backend-db
+    labels:
+      tier: backend
+      component: api
+    values:
+      - values/api.yaml.gotmpl
+
+  - name: frontend-web
+    namespace: {{ .Values.namespace }}
+    createNamespace: true
+    chart: ../charts/nginx-demo
+    needs:
+      - {{ .Values.namespace }}/backend-api
+    labels:
+      tier: frontend
+      component: web
+    values:
+      - values/web.yaml.gotmpl
+
+  - name: monitoring-probe
+    namespace: {{ .Values.namespace }}
+    createNamespace: true
+    chart: podinfo/podinfo
+    version: {{ .Values.probe.version }}
+    labels:
+      tier: monitoring
+      component: probe
+    values:
+      - replicaCount: 1
+      - ui:
+          color: {{ .Values.probe.color | quote }}
+          message: {{ .Values.probe.message | quote }}

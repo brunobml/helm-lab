@@ -1,0 +1,11 @@
+environment: dev
+namespace: helm-lab-dev
+domain: dev.lab.internal
+web:
+  replicas: 1
+  pdb: false
+  networkPolicy: false
+probe:
+  version: "6.14.0"
+  color: "#34577c"
+  message: "Hello from Dev Fleet"

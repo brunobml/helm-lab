@@ -59,18 +59,17 @@ stay optional and are referenced by the labs that need them.
 - **Exercises:** unprivileged NGINX container architecture (UID 101, port 8080), Pod and container `securityContext` (`runAsNonRoot`, `RuntimeDefault`, `allowPrivilegeEscalation: false`, `capabilities.drop: [ALL]`), dynamic `emptyDir` mounts for `readOnlyRootFilesystem`, hardening test hooks and migration Jobs, `PodDisruptionBudget` (`minAvailable: 1`), `topologySpreadConstraints`, default CPU/memory requests and limits, `NetworkPolicy` ingress/egress rules, auto-generated documentation via `helm-docs`, and strict OpenAPI schema validation via `kubeconform`.
 - **Traps it teaches:** the Pod Security admission rejection trap (unhardened pods failing ReplicaSet creation while existing pods continue running), the hook admission failure trap (unhardened test or migration pods breaking releases in secure clusters), and DNS egress blocking when applying egress NetworkPolicies.
 
+## Done: Lab 17, Many releases: Helmfile (and Argo CD ApplicationSet)
+
+**Goal:** orchestrate multi-release fleets across environments using Helmfile, enforce directed acyclic graph (DAG) dependency ordering with `needs:`, implement layered values templates, manage label-filtered sub-fleets, and declare multi-environment delivery with Argo CD ApplicationSet.
+
+- **Stack:** `backend-db` (`charts/shop-db`), `backend-api` (`charts/shop-api`), `frontend-web` (`charts/nginx-demo`), and `monitoring-probe` (`podinfo/podinfo`).
+- **Exercises:** Helmfile structure (`helmfile.yaml.gotmpl`, `environments/`, `values/`), layered values with Go templating (`.Values`), DAG topological installation (`backend-db` -> `backend-api` -> `frontend-web`), label filtering (`-l tier=backend`), environment promotion (`dev` to `prod` via version/scale bumps), and Argo CD `ApplicationSet` with the `List` generator.
+- **Traps it teaches:** the multi-document YAML syntax requirement in Helmfile v1, the `.gotmpl` extension requirement for dynamic Helmfile templates, the unpinned release drift trap, and circular DAG dependencies.
+
 ## Advanced track (in progress)
 
 Each lab below is independent of the others unless noted. Order is a recommendation, not a rule.
-
-### Lab 17: Many releases: Helmfile (and Argo CD ApplicationSet)
-
-**Why:** one chart is easy; twenty releases across environments is the real job.
-
-- Helmfile: declare releases, environments, layered values, `needs:` ordering, and `helmfile diff/apply`.
-- The same fleet as an Argo CD `ApplicationSet` (for those with Argo CD from Lab 9).
-- Promotion workflow: dev to prod by changing a version, not a template.
-- **Break it:** an unpinned chart version changes under you.
 
 ### Lab 18: Helm internals and advanced operations
 

@@ -1,0 +1,11 @@
+environment: prod
+namespace: helm-lab-prod
+domain: prod.lab.internal
+web:
+  replicas: 2
+  pdb: true
+  networkPolicy: true
+probe:
+  version: "6.15.0"
+  color: "#007acc"
+  message: "Hello from Prod Fleet"

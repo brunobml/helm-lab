@@ -1,0 +1,41 @@
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  name: shop-fleet
+  namespace: argocd
+spec:
+  generators:
+    - list:
+        elements:
+          - env: dev
+            namespace: helm-lab-dev
+            webReplicas: "1"
+            probeVersion: "6.14.0"
+          - env: prod
+            namespace: helm-lab-prod
+            webReplicas: "2"
+            probeVersion: "6.15.0"
+  template:
+    metadata:
+      name: "{{env}}-frontend-web"
+    spec:
+      project: default
+      source:
+        repoURL: "https://github.com/brunobml/helm-lab.git"
+        targetRevision: HEAD
+        path: charts/nginx-demo
+        helm:
+          releaseName: frontend-web
+          values: |
+            replicaCount: {{webReplicas}}
+            extraEnv:
+              ENVIRONMENT: "{{env}}"
+      destination:
+        server: "https://kubernetes.default.svc"
+        namespace: "{{namespace}}"
+      syncPolicy:
+        automated:
+          prune: true
+          selfHeal: true
+        syncOptions:
+          - CreateNamespace=true

@@ -1,0 +1,8 @@
+replicaCount: {{ .Values.web.replicas }}
+podDisruptionBudget:
+  enabled: {{ .Values.web.pdb }}
+networkPolicy:
+  enabled: {{ .Values.web.networkPolicy }}
+extraEnv:
+  API_URL: "http://backend-api:3000"
+  ENVIRONMENT: {{ .Values.environment | quote }}

@@ -13,3 +13,10 @@ service:
   port: 3000
 
 resources: {}
+
+user: shop
+database: shop
+dbHost: backend-db
+secret:
+  create: false
+  password: ""
