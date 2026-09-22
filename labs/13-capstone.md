@@ -630,16 +630,12 @@ Anchored with `/`, as in Lab 12.
 
 `charts/shop/values-dev.yaml`:
 
-`charts/shop/values-dev.yaml`:
-
 ```yaml
 global:
   environment: dev
 ```
 
 `charts/shop/values-prod.yaml` (two replicas per tier, persistence, resources, an extra seed row):
-
-`charts/shop/values-prod.yaml`:
 
 ```yaml
 global:
@@ -872,8 +868,6 @@ helm test shop-dev -n helm-lab --timeout 90s
 
 `charts/shop/tests/credentials_test.yaml`:
 
-`charts/shop/tests/credentials_test.yaml`:
-
 ```yaml
 suite: credentials secret
 templates:
@@ -919,8 +913,6 @@ tests:
       - hasDocuments:
           count: 0
 ```
-
-`charts/shop/tests/migration_test.yaml`:
 
 `charts/shop/tests/migration_test.yaml`:
 
@@ -996,8 +988,6 @@ tests:
 
 `charts/shop/tests/wiring_test.yaml` (it addresses subchart templates as `charts/<alias>/templates/...`):
 
-`charts/shop/tests/wiring_test.yaml`:
-
 ```yaml
 suite: subchart wiring
 templates:
@@ -1060,8 +1050,6 @@ helm unittest charts/nginx-demo charts/shop
 
 `charts/shop/ci/ci-values.yaml`:
 
-`charts/shop/ci/ci-values.yaml`:
-
 ```yaml
 # Dummy password for CI only; real ones come from encrypted files.
 credentials:
@@ -1096,9 +1084,17 @@ ct install --config ct.yaml --charts charts/shop
 
 ### Step 17: Package, sign, publish, verify, install
 
-Use a throwaway GnuPG home exactly as in Lab 12 Step 12 (`GNUPGHOME`, the `Helm Lab` key, `pubring.gpg`, `secring.gpg`), then:
+Set up the throwaway GnuPG signing key (or reuse the one from Lab 12 if still in your session):
 
 ```bash
+if [ -z "$GNUPGHOME" ] || [ ! -f "$GNUPGHOME/secring.gpg" ]; then
+  export GNUPGHOME=$(mktemp -d); chmod 700 "$GNUPGHOME"
+  gpg --batch --pinentry-mode loopback --passphrase '' \
+    --quick-generate-key "Helm Lab <helm-lab@example.com>" rsa3072 default 1y
+  gpg --export > "$GNUPGHOME/pubring.gpg"
+  gpg --batch --pinentry-mode loopback --passphrase '' --export-secret-keys > "$GNUPGHOME/secring.gpg"
+fi
+
 mkdir -p /tmp/shop-pkg
 helm package charts/shop --sign --key "Helm Lab" --keyring "$GNUPGHOME/secring.gpg" -d /tmp/shop-pkg
 tar tzf /tmp/shop-pkg/shop-0.1.0.tgz | grep -E "secrets\.|\.sops|shop/tests/|shop/ci/"   # no output
@@ -1233,7 +1229,8 @@ kubectl delete pvc -n helm-lab -l app.kubernetes.io/instance=shop-prod       # S
 kubectl delete pod,job -n helm-lab -l 'app.kubernetes.io/instance in (shop-dev,shop-prod,shop-oci)'
 kubectl get pvc,pods,job -n helm-lab | grep -i shop                          # nothing should remain
 docker rm -f helm-registry 2>/dev/null || true
-rm -rf /tmp/shop-pkg /tmp/shop-pull /tmp/shop.yaml
+rm -rf /tmp/shop-pkg /tmp/shop-pull /tmp/shop.yaml "$GNUPGHOME"
+unset GNUPGHOME
 ```
 
 Keep `~/.config/sops/age/keys.txt`. You may commit `charts/shop/secrets.*.yaml` and `.sops.yaml` (encrypted); never commit the private key.

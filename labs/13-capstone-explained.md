@@ -132,3 +132,132 @@ A starting list; the Roadmap's Lab 16 covers most of it:
 - Non-idempotent migrations, and migrations that are not backward compatible with the previous app version.
 - Treating a persistent database's Secret as the source of truth for its password.
 - Forgetting that `helm uninstall` leaves StatefulSet volumes behind (`kubectl delete pvc ...`).
+
+---
+
+## Break It and Recover — Detailed Walkthrough
+
+### 1. Deploy Without the Secrets File
+
+#### What Happens
+Running `helm install x ./charts/shop -n helm-lab` without supplying `-f secrets.dev.yaml` fails immediately with:
+```text
+Error: INSTALLATION FAILED: execution error at (shop/templates/credentials-secret.yaml:2:17): credentials.dbPassword is required; deploy with: helm secrets install ... -f secrets.<env>.yaml
+```
+
+#### Why It Happens
+In `charts/shop/templates/credentials-secret.yaml`, the template invokes Helm's built-in `required` function:
+```yaml
+{{- $password := required "credentials.dbPassword is required; deploy with: helm secrets install ... -f secrets.<env>.yaml" .Values.credentials.dbPassword }}
+```
+If `.Values.credentials.dbPassword` evaluates to empty or unset, `required` halts template rendering with a customized, actionable error message before sending any API requests to the Kubernetes control plane.
+
+#### Key Takeaways & Recovery
+- **Fail-fast validation**: Template-level enforcement prevents partial or broken deployments (such as PostgreSQL pods crashlooping or initializing with unintended defaults).
+- **Recovery**: Always supply the encrypted secret values file using the `helm-secrets` plugin:
+  ```bash
+  helm secrets install shop-dev ./charts/shop -n helm-lab -f ./charts/shop/values-dev.yaml -f ./charts/shop/secrets.dev.yaml
+  ```
+
+---
+
+### 2. Plain `helm` on the Encrypted File
+
+#### What Happens
+Running `helm template` or `helm install` directly against `secrets.dev.yaml` without `helm secrets`:
+```bash
+helm template s charts/shop -f charts/shop/secrets.dev.yaml | grep POSTGRES_PASSWORD
+```
+outputs:
+```yaml
+  POSTGRES_PASSWORD: "ENC[AES256_GCM,data:...,iv:...,tag:...,type:str]"
+```
+
+#### Why It Happens
+SOPS encrypts values in-place while maintaining valid YAML syntax. To a vanilla `helm` CLI, `ENC[AES256_GCM,...]` is just an ordinary literal string value. Helm embeds this raw ciphertext directly into the Secret.
+
+#### Key Takeaways & Recovery
+- **Silent failure until runtime**: The chart will render and install without any Helm errors, but PostgreSQL initializes with the ciphertext as the password, and client services using plaintext passwords fail with `FATAL: password authentication failed for user "shop"`.
+- **Always use `helm secrets`**: `helm-secrets` seamlessly invokes `sops` to decrypt the values file to an ephemeral decrypted buffer before passing it to Helm, scrubbing decrypted data when the command terminates.
+
+---
+
+### 3. Label Collision & Cross-Chart Service Hijacking
+
+#### What Happens
+If `app: {{ .Release.Name }}` is added to `shop-api.selectorLabels` in `charts/shop-api/templates/_helpers.tpl`:
+1. The unit test `api and db pods do not carry the web selector label` in `wiring_test.yaml` fails immediately:
+   ```text
+   FAIL subchart wiring (charts/shop/tests/wiring_test.yaml)
+     - api and db pods do not carry the web selector label
+       - asserts[0] `notExists` fail: spec.template.metadata.labels.app expected to NOT exists
+   ```
+2. If deployed to the cluster (`shop-bad`), `helm install --wait` succeeds completely. However, inspecting the Service endpoints:
+   ```bash
+   kubectl get endpointslices -n helm-lab -l kubernetes.io/service-name=shop-bad-service
+   ```
+   reveals **two** endpoint IP addresses: one for the `web` pod and one for the `api` pod.
+3. Sending client HTTP requests to `shop-bad-service:80` randomly alternates between returning `<h1>Shop (dev)</h1>` and failing with `can't connect to remote host: Connection refused`.
+
+#### Why It Happens
+`nginx-demo` uses `app: {{ .Release.Name }}` as its Service selector. Kubernetes Services match pods across the entire namespace based solely on label equality. Because both `web` and `api` pods were stamped with `app: shop-bad`, kube-proxy round-robins traffic between them. When traffic hits the `api` container on port 80, the connection is refused because PostgREST listens on port 3000, not port 80.
+
+#### Key Takeaways & Recovery
+- **Why it is insidious**: Neither the web pod nor the api pod is in a CrashLoop or unready state. Liveness and readiness probes pass because each pod answers on its own expected port. The release appears completely green in `helm status` and `kubectl get pods`, yet user traffic is intermittently blackholed.
+- **Prevention**: Umbrella architectures must enforce strict label isolation. New subcharts should always select on `app.kubernetes.io/name` and `app.kubernetes.io/component`. Unit tests in `wiring_test.yaml` protect against selector overlap before code is merged.
+- **Recovery**: Remove the offending selector label from `shop-api`, rebuild the umbrella dependencies, and redeploy:
+  ```bash
+  helm dependency build charts/shop
+  helm secrets upgrade shop-dev ./charts/shop -n helm-lab -f ./charts/shop/values-dev.yaml -f ./charts/shop/secrets.dev.yaml
+  ```
+
+---
+
+### 4. Build in the Wrong Order (Nested Local Dependencies)
+
+#### What Happens
+If you remove all `.tgz` archives from `charts/nginx-demo/charts/` and `charts/shop/charts/`, and run `helm dependency build charts/shop` directly, the build command exits 0, but rendering fails:
+```text
+Error: template: shop/charts/web/templates/serviceaccount.yaml:7:8: executing "shop/charts/web/templates/serviceaccount.yaml" at <include "nginx-demo.labels" .>: error calling include: template: shop/charts/web/templates/_helpers.tpl:12:4: executing "nginx-demo.labels" at <include "lab-common.labels" .>: error calling include: template: no template "lab-common.labels" associated with template "gotpl"
+```
+
+#### Why It Happens
+Helm dependency resolution for `file://` references is not recursive. `charts/shop` depends on `nginx-demo`. When `helm dependency build charts/shop` runs, Helm creates `shop/charts/nginx-demo-0.5.0.tgz` from the contents of the `charts/nginx-demo` folder. If `charts/nginx-demo/charts/` is empty (because `helm dependency build charts/nginx-demo` was not executed first), the packaged `nginx-demo` archive will lack `lab-common` and `lab-banner`.
+When Helm evaluates the umbrella chart templates, `include "lab-common.labels"` fails because the library chart templates were never included in the archive.
+
+#### Key Takeaways & Recovery
+- **Misleading error messages**: The error message names a missing gotpl template (`no template "lab-common.labels"`), which looks like a typo in helper template definitions rather than a missing archive dependency.
+- **Bottom-up build rule**: In multi-tier charts with nested dependencies, always build inner/leaf dependencies before building parent charts:
+  ```bash
+  helm dependency build charts/nginx-demo
+  helm dependency build charts/shop
+  ```
+- In CI pipelines, ensure each chart's dependencies are resolved in dependency graph order (as configured in `.github/workflows/chart-ci.yaml`).
+
+---
+
+### 5. A Migration That Is Not Idempotent
+
+#### What Happens
+If `CREATE TABLE IF NOT EXISTS items` is changed to `CREATE TABLE items` in `charts/shop/templates/migration-job.yaml` and an upgrade is executed:
+```bash
+helm secrets upgrade shop-dev ./charts/shop -n helm-lab --atomic --timeout 90s
+```
+The upgrade fails:
+```text
+Error: UPGRADE FAILED: release shop-dev failed, and has been rolled back due to atomic being set: post-upgrade hooks failed: 1 error occurred:
+	* job shop-dev-migrate failed: BackoffLimitExceeded
+```
+Checking the migration job log shows:
+```text
+psql:/migrations/001-init.sql:4: ERROR:  relation "items" already exists
+```
+Because `--atomic` was supplied, Helm rolls the release back to the previous revision (`Rollback to N`).
+
+#### Why It Happens
+`post-install` and `post-upgrade` hooks execute on every release operation. Because the database was already initialized during install, the table `items` already exists. Non-idempotent SQL halts execution with an error, causing the Job pod to exit non-zero.
+
+#### Key Takeaways & Recovery
+- **Post-upgrade hook behavior vs Pre-upgrade**: A `pre-upgrade` hook failure prevents manifests from applying. A `post-upgrade` hook failure occurs *after* new resources have already been applied to the cluster.
+- **The necessity of `--atomic`**: Without `--atomic`, a failed post-upgrade hook leaves the release in `failed` status while keeping the new manifests (e.g. updated replicas or image tags) running against an unmigrated database. `--atomic` ensures automatic rollback of cluster manifests upon hook failure.
+- **Database state is not rolled back**: Helm can roll back Kubernetes objects, but it cannot roll back SQL mutations applied to a persistent database. DDL scripts must always be idempotent (`CREATE TABLE IF NOT EXISTS`, `ON CONFLICT DO NOTHING`, conditional role creation, and transactional migration blocks).
