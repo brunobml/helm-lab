@@ -1,0 +1,7 @@
+# Default values for crd-demo.
+crontab:
+  enabled: true
+  name: my-cron
+  schedule: "* * * * */5"
+  image: busybox:latest
+  replicas: 1

@@ -85,6 +85,7 @@ If you already completed the original fundamentals, use Labs 0–3 as a short re
 - [ ] [12. Secrets, signing, and CI](labs/12-secrets-signing-and-ci.md) — SOPS secrets, unit tests, provenance/cosign, and chart-testing
 - [ ] [13. Capstone: a three-tier release](labs/13-capstone.md) — umbrella chart, hooks, secrets, probes, CI, and publishing
 - [ ] [14. Consuming third-party charts](labs/14-consuming-third-party-charts.md) — repositories, minimal overrides, diffing, post-rendering with Kustomize, and rollback
+- [ ] [15. CRDs and operators](labs/15-crds-and-operators.md) — the `crds/` directory, cert-manager, upgrade traps, and ordering
 
 Optional extensions after Lab 7:
 
@@ -116,6 +117,7 @@ This repository includes prebuilt, cluster-verified reference tags for every mil
 | `lab-12-complete` | Lab 12: `secret.create` + SOPS workflow, `helm-unittest` suites, `ct` config and `ci/` scenarios, GitHub Actions workflow, chart `0.5.0` |
 | `lab-13-complete` | Lab 13: `shop` umbrella chart with `shop-api` and `shop-db`, migration hook, smoke test, unit tests |
 | `lab-14-complete` | Lab 14: Third-party chart lifecycle (`podinfo`), minimal values, `helm diff`, post-renderer Kustomize, rollback |
+| `lab-15-complete` | Lab 15: CRD lifecycle (`charts/crd-demo`), `cert-manager` operator, silent drop trap, manual CRD upgrade playbook |
 | `extension-networking-complete` | Extension: Ingress and NodePort configuration |
 | `extension-health-complete` | Extension: Health probes and HorizontalPodAutoscaler (HPA v2) |
 | `extension-identity-complete` | Extension: ServiceAccount, RBAC Role/RoleBinding, and external Secrets |
@@ -139,7 +141,7 @@ Work inside this repository without modifying `main` or losing reference solutio
    git checkout -b my-learning lab-00-start
    ```
 
-2. Follow the lab instructions in `labs/01-first-chart.md` through `labs/14-consuming-third-party-charts.md`.
+2. Follow the lab instructions in `labs/01-first-chart.md` through `labs/15-crds-and-operators.md`.
 3. Test commands against your cluster and commit your progress as you complete each lab:
 
    ```bash

@@ -43,19 +43,17 @@ stay optional and are referenced by the labs that need them.
 - **Exercises:** `helm repo add`/`update`/`search`, `helm show chart/readme/values`, pulling and inspecting templates, minimal delta values file vs full-copy anti-pattern, `helm diff upgrade`, `--post-renderer` with `kubectl kustomize` for corporate compliance annotations/labels, rollback rehearsal.
 - **Traps it teaches:** the floating version trap (unpinned `--version`), missing client-side schema in community charts (requiring server dry-run validation), post-renderer syntax failures blocking deployment before cluster submission.
 
+## Done: Lab 15, CRDs and operators
+
+**Goal:** master Custom Resource Definition lifecycles, the native `crds/` directory limitations, operator management patterns, and manual CRD upgrade playbooks.
+
+- **Chart:** `charts/crd-demo` (educational custom CRD chart) and `jetstack/cert-manager` (production operator).
+- **Exercises:** `crds/` install behavior, `helm template` vs `helm template --include-crds`, observing that `helm upgrade` leaves `crds/` untouched, observing the Kubernetes silent field drop, 3-way merge desync mechanics, manual CRD upgrade via `kubectl apply`, `cert-manager` deployment with `crds.enabled=true`, safe uninstall with `helm.sh/resource-policy: keep`, and CRD ordering/hook traps.
+- **Traps it teaches:** the silent drop trap (un-upgraded CRD dropping fields), the 3-way merge desync (manifests recorded in release Secrets but stripped on cluster), the cascade deletion danger on uninstall, and ordering failures in umbrella charts and pre-install hooks.
+
 ## Advanced track (in progress)
 
 Each lab below is independent of the others unless noted. Order is a recommendation, not a rule.
-
-### Lab 15: CRDs and operators
-
-**Why:** CRDs are the most common Helm surprise.
-
-- The `crds/` directory: installed once, never upgraded or deleted by Helm. What that means in practice.
-- Patterns: separate CRD chart, CRDs applied by the pipeline, or the operator installing its own.
-- Install a real operator chart (cert-manager) and create a custom resource; ordering with hooks.
-- Upgrade the CRDs by hand and prove what Helm leaves alone.
-- **Break it:** create a custom resource before its CRD exists. **Verify needs:** cluster and internet.
 
 ### Lab 16: Production hardening and chart best practices
 

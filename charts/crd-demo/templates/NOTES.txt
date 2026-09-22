@@ -1,0 +1,10 @@
+Thank you for installing {{ .Chart.Name }}!
+
+Release: {{ .Release.Name }}
+Namespace: {{ .Release.Namespace }}
+
+To inspect the CustomResourceDefinition managed in crds/:
+  kubectl get crd crontabs.stable.example.com
+
+To inspect the CustomResource instance:
+  kubectl get crontabs -n {{ .Release.Namespace }}

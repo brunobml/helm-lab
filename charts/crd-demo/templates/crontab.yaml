@@ -1,0 +1,17 @@
+{{- if .Values.crontab.enabled }}
+apiVersion: stable.example.com/v1
+kind: CronTab
+metadata:
+  name: {{ .Values.crontab.name | default "my-cron" }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app.kubernetes.io/name: crd-demo
+    app.kubernetes.io/instance: {{ .Release.Name }}
+    app.kubernetes.io/managed-by: {{ .Release.Service }}
+spec:
+  cronSpec: {{ .Values.crontab.schedule | quote }}
+  image: {{ .Values.crontab.image | quote }}
+  {{- if .Values.crontab.replicas }}
+  replicas: {{ .Values.crontab.replicas }}
+  {{- end }}
+{{- end }}
