@@ -31,7 +31,7 @@ curl -fsSL -o cosign https://github.com/sigstore/cosign/releases/download/v3.1.3
 chmod +x sops cosign
 curl -fsSL https://github.com/FiloSottile/age/releases/download/v1.3.2/age-v1.3.2-linux-amd64.tar.gz | tar xz --strip-components=1 age/age age/age-keygen
 curl -fsSL https://github.com/helm/chart-testing/releases/download/v3.14.0/chart-testing_3.14.0_linux_amd64.tar.gz | tar xz ct
-pip install --user yamllint yamale
+pip install --user --break-system-packages yamllint yamale
 cd - >/dev/null
 sops --version; age --version; cosign version | grep GitVersion; ct version | head -1
 ```
@@ -115,16 +115,24 @@ secret:
   data: {}
 ```
 
-Add to the top-level `properties` in `charts/nginx-demo/values.schema.json`:
+Add to the top-level `properties` in `charts/nginx-demo/values.schema.json`. Notice the comma `,` added after `"migration": { ... }`:
 
 ```json
-"secret": {
-  "type": "object",
-  "properties": {
-    "create": { "type": "boolean" },
-    "data": { "type": "object" }
-  }
-}
+    "migration": {
+      "type": "object",
+      "properties": {
+        "enabled": { "type": "boolean" },
+        "image": { "type": "string", "minLength": 1 },
+        "fail": { "type": "boolean" }
+      }
+    },
+    "secret": {
+      "type": "object",
+      "properties": {
+        "create": { "type": "boolean" },
+        "data": { "type": "object" }
+      }
+    }
 ```
 
 Bump `version` in `charts/nginx-demo/Chart.yaml` to `0.5.0`. Make sure nothing changed by default:
@@ -699,6 +707,9 @@ ct lint --config ct.yaml --all
 
 *Expect:* `All charts linted successfully` for `lab-banner`, `lab-common`, `nginx-demo`, and `storage-demo`.
 
+> [!NOTE]
+> `ct lint` runs `yamllint`, which forbids trailing empty lines at the end of YAML files (`empty-lines: max: 0`). If you see `error too many blank lines (1 > 0) (empty-lines)`, ensure `values.yaml` ends with a single newline and no trailing blank lines.
+
 ### Step 19: Give ct install scenarios
 
 `ct install` installs the chart once **per file** in the chart's `ci/` directory, then runs `helm test`. Create three:
@@ -747,9 +758,13 @@ normal `ct` output.
 `ct` compares your branch with `origin/<target-branch>`, so that ref must exist and be current
 (`git fetch origin main`, and push `main` first, otherwise your unpushed commits count as changes).
 
+Make sure your current lab progress is committed on your branch before testing disposable branches so uncommitted work is not lost:
+
 ```bash
+git add . && git commit -m "feat: lab 12 progress"
+
 git switch -c bump-test
-echo "# tweak" >> charts/nginx-demo/values.yaml && git commit -qam "tweak values"
+echo "# tweak" >> charts/nginx-demo/values.yaml && git commit -am "tweak values"
 ct lint --config ct.yaml
 ```
 
@@ -879,8 +894,8 @@ ct install --config ct.yaml --charts charts/nginx-demo
    fails the `helm test hook` suite. Restore.
 4. **Break a unit test on purpose.** Change `"%s-deployment"` to `"%s-deploy"` in `_helpers.tpl` and run `helm unittest`.
    *Expect:* the test `names the Deployment and selector after the release` fails with `Expected: shop-deployment`. Restore.
-5. **Decrypt with the wrong key.** `SOPS_AGE_KEY_FILE=/dev/null helm secrets decrypt charts/nginx-demo/secrets.dev.yaml`
-   fails; that is the intended behavior for anyone without your key.
+5. **Decrypt with the wrong key.** `XDG_CONFIG_HOME=$(mktemp -d) SOPS_AGE_KEY_FILE=/dev/null helm secrets decrypt charts/nginx-demo/secrets.dev.yaml`
+   fails (SOPS defaults to `~/.config/sops/age/keys.txt`, so isolating `XDG_CONFIG_HOME` simulates an unauthorized machine without your private key). That is the intended behavior for anyone without your key.
 
 ## Explain
 
