@@ -86,6 +86,7 @@ If you already completed the original fundamentals, use Labs 0–3 as a short re
 - [ ] [13. Capstone: a three-tier release](labs/13-capstone.md) — umbrella chart, hooks, secrets, probes, CI, and publishing
 - [ ] [14. Consuming third-party charts](labs/14-consuming-third-party-charts.md) — repositories, minimal overrides, diffing, post-rendering with Kustomize, and rollback
 - [ ] [15. CRDs and operators](labs/15-crds-and-operators.md) — the `crds/` directory, cert-manager, upgrade traps, and ordering
+- [ ] [16. Production hardening and chart best practices](labs/16-production-hardening-and-best-practices.md) — Pod Security restricted, PDB, NetworkPolicy, helm-docs, and kubeconform
 
 Optional extensions after Lab 7:
 
@@ -118,6 +119,7 @@ This repository includes prebuilt, cluster-verified reference tags for every mil
 | `lab-13-complete` | Lab 13: `shop` umbrella chart with `shop-api` and `shop-db`, migration hook, smoke test, unit tests |
 | `lab-14-complete` | Lab 14: Third-party chart lifecycle (`podinfo`), minimal values, `helm diff`, post-renderer Kustomize, rollback |
 | `lab-15-complete` | Lab 15: CRD lifecycle (`charts/crd-demo`), `cert-manager` operator, silent drop trap, manual CRD upgrade playbook |
+| `lab-16-complete` | Lab 16: Production hardening (`nginx-demo` 0.6.0), Pod Security `restricted`, PDB, NetworkPolicy, `helm-docs`, `kubeconform` |
 | `extension-networking-complete` | Extension: Ingress and NodePort configuration |
 | `extension-health-complete` | Extension: Health probes and HorizontalPodAutoscaler (HPA v2) |
 | `extension-identity-complete` | Extension: ServiceAccount, RBAC Role/RoleBinding, and external Secrets |
@@ -141,7 +143,7 @@ Work inside this repository without modifying `main` or losing reference solutio
    git checkout -b my-learning lab-00-start
    ```
 
-2. Follow the lab instructions in `labs/01-first-chart.md` through `labs/15-crds-and-operators.md`.
+2. Follow the lab instructions in `labs/01-first-chart.md` through `labs/16-production-hardening-and-best-practices.md`.
 3. Test commands against your cluster and commit your progress as you complete each lab:
 
    ```bash

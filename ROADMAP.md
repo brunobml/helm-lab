@@ -51,20 +51,17 @@ stay optional and are referenced by the labs that need them.
 - **Exercises:** `crds/` install behavior, `helm template` vs `helm template --include-crds`, observing that `helm upgrade` leaves `crds/` untouched, observing the Kubernetes silent field drop, 3-way merge desync mechanics, manual CRD upgrade via `kubectl apply`, `cert-manager` deployment with `crds.enabled=true`, safe uninstall with `helm.sh/resource-policy: keep`, and CRD ordering/hook traps.
 - **Traps it teaches:** the silent drop trap (un-upgraded CRD dropping fields), the 3-way merge desync (manifests recorded in release Secrets but stripped on cluster), the cascade deletion danger on uninstall, and ordering failures in umbrella charts and pre-install hooks.
 
+## Done: Lab 16, Production hardening and chart best practices
+
+**Goal:** harden charts to meet enterprise production requirements, pass the Kubernetes Pod Security `restricted` profile, ensure zero-downtime resilience, restrict network traffic, automate documentation, and validate OpenAPI schemas in CI.
+
+- **Chart:** `charts/nginx-demo` (bumped to `0.6.0`).
+- **Exercises:** unprivileged NGINX container architecture (UID 101, port 8080), Pod and container `securityContext` (`runAsNonRoot`, `RuntimeDefault`, `allowPrivilegeEscalation: false`, `capabilities.drop: [ALL]`), dynamic `emptyDir` mounts for `readOnlyRootFilesystem`, hardening test hooks and migration Jobs, `PodDisruptionBudget` (`minAvailable: 1`), `topologySpreadConstraints`, default CPU/memory requests and limits, `NetworkPolicy` ingress/egress rules, auto-generated documentation via `helm-docs`, and strict OpenAPI schema validation via `kubeconform`.
+- **Traps it teaches:** the Pod Security admission rejection trap (unhardened pods failing ReplicaSet creation while existing pods continue running), the hook admission failure trap (unhardened test or migration pods breaking releases in secure clusters), and DNS egress blocking when applying egress NetworkPolicies.
+
 ## Advanced track (in progress)
 
 Each lab below is independent of the others unless noted. Order is a recommendation, not a rule.
-
-### Lab 16: Production hardening and chart best practices
-
-**Why:** a chart that works is not yet a chart that is safe to run.
-
-- `securityContext` defaults that pass the Pod Security `restricted` profile (non-root, read-only root filesystem, dropped capabilities).
-- `NetworkPolicy`, `PodDisruptionBudget`, topology spread, and resource requests as chart features with tests.
-- `helm.sh/resource-policy: keep` and other lifecycle annotations.
-- A strict values schema (`additionalProperties: false`, `$ref`s), and generated values docs with `helm-docs`.
-- Enforce the rules in CI with a policy scan (for example `kubeconform` and a policy tool).
-- **Break it:** deploy into a namespace enforcing `restricted`; fix the chart until it is admitted.
 
 ### Lab 17: Many releases: Helmfile (and Argo CD ApplicationSet)
 

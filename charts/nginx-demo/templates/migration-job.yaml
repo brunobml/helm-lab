@@ -17,9 +17,21 @@ spec:
         {{- include "nginx-demo.labels" . | nindent 8 }}
     spec:
       restartPolicy: Never
+      securityContext:
+        runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
       containers:
         - name: migrate
           image: "{{ .Values.migration.image }}"
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+            readOnlyRootFilesystem: true
+            runAsNonRoot: true
+            runAsUser: 1000
           command: ["sh", "-c"]
           args:
             - |

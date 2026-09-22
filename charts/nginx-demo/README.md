@@ -1,37 +1,59 @@
 # nginx-demo
 
-The starter application for [Helm Lab](../../README.md).
-It renders one Deployment and one ClusterIP Service, with two NGINX replicas.
-Start with [Lab 1](../../labs/01-first-chart.md); implement subsequent features
-in this directory as you work through the labs.
+![Version: 0.6.0](https://img.shields.io/badge/Version-0.6.0-informational?style=flat-square) ![Type: application](https://img.shields.io/badge/Type-application-informational?style=flat-square) ![AppVersion: 1.30.4](https://img.shields.io/badge/AppVersion-1.30.4-informational?style=flat-square)
 
-From the repository root:
+A small NGINX application for the Helm Lab exercises
 
-```bash
-helm lint ./charts/nginx-demo
-helm template demo-dev ./charts/nginx-demo
-helm install demo-dev ./charts/nginx-demo -n helm-lab --create-namespace --wait --timeout 120s
-```
+## Requirements
 
-| Value | Default | Meaning |
-| --- | --- | --- |
-| `replicaCount` | `2` | Desired Pod count |
-| `image.repository` | `nginx` | Container image repository |
-| `image.tag` | `1.30.4-alpine` | Explicit NGINX version and image variant |
-| `image.pullPolicy` | `IfNotPresent` | Use a local image if available |
-| `service.type` | `ClusterIP` | How Kubernetes exposes the Service |
-| `service.port` | `80` | Port clients use on the Service |
-| `service.targetPort` | `80` | Port NGINX actually listens on |
+| Repository | Name | Version |
+|------------|------|---------|
+| file://../lab-banner | lab-banner | 0.1.0 |
+| file://../lab-common | lab-common | 0.1.0 |
 
-The image tag comes from the [official NGINX image metadata](https://github.com/docker-library/official-images/blob/master/library/nginx).
-A versioned tag reduces unexpected changes; a digest is required for immutable
-image identity. `Chart.yaml`'s `version` versions this package; `appVersion`
-describes the application. Neither automatically overrides `image.tag`.
+## Values
 
-Changing `service.port` to 8080 is supported. Changing `service.targetPort` to
-8080 does not reconfigure NGINX, which still listens on 80. The declared
-`containerPort` is also metadata, not server configuration.
+| Key | Type | Default | Description |
+|-----|------|---------|-------------|
+| autoscaling.enabled | bool | `false` |  |
+| autoscaling.maxReplicas | int | `5` |  |
+| autoscaling.minReplicas | int | `1` |  |
+| autoscaling.targetCPUUtilizationPercentage | int | `80` |  |
+| existingSecret | string | `""` |  |
+| extraConfigMaps | object | `{}` | Extra ConfigMaps rendered by the lab-common library. Map of name -> map of key/value. |
+| extraEnv | object | `{}` | Extra environment variables for the NGINX container. |
+| global.environment | string | `"local"` |  |
+| image.pullPolicy | string | `"IfNotPresent"` | Image pull policy |
+| image.repository | string | `"nginxinc/nginx-unprivileged"` | Image repository (unprivileged nginx to allow rootless operation) |
+| image.tag | string | `"1.27-alpine"` | Explicit application version; use a digest for immutable image identity. |
+| ingress.annotations | object | `{}` |  |
+| ingress.className | string | `""` |  |
+| ingress.enabled | bool | `false` |  |
+| ingress.hosts[0].host | string | `"chart-example.local"` |  |
+| ingress.hosts[0].paths[0].path | string | `"/"` |  |
+| ingress.hosts[0].paths[0].pathType | string | `"ImplementationSpecific"` |  |
+| ingress.tls | list | `[]` |  |
+| lab-banner.enabled | bool | `true` |  |
+| lab-banner.message | string | `"Hello from the parent"` |  |
+| livenessProbe | object | `{"httpGet":{"path":"/","port":8080}}` | Liveness probe configuration. |
+| migration | object | `{"enabled":true,"fail":false,"image":"busybox:1.36"}` | Pre-install/pre-upgrade hook Job that simulates a database migration. |
+| networkPolicy | object | `{"enabled":false}` | NetworkPolicy configuration for network micro-segmentation. |
+| pageContent | string | `"<h1>Hello from Helm Lab</h1>\n"` | Custom HTML content for the demo index page. |
+| podDisruptionBudget | object | `{"enabled":false,"minAvailable":1}` | PodDisruptionBudget configuration for high availability during node maintenance. |
+| podSecurityContext | object | `{"runAsNonRoot":true,"seccompProfile":{"type":"RuntimeDefault"}}` | Pod-level security context configuration for Pod Security restricted profile. |
+| rbac.create | bool | `false` |  |
+| readinessProbe | object | `{"httpGet":{"path":"/","port":8080}}` | Readiness probe configuration. |
+| replicaCount | int | `2` | replicaCount controls how many NGINX Pods the Deployment runs. |
+| resources | object | `{"limits":{"cpu":"200m","memory":"128Mi"},"requests":{"cpu":"50m","memory":"64Mi"}}` | CPU and memory resource requests and limits. |
+| secret | object | `{"create":false,"data":{}}` | Secret created by this chart. Supply secret.data from an encrypted values file. |
+| securityContext | object | `{"allowPrivilegeEscalation":false,"capabilities":{"drop":["ALL"]},"readOnlyRootFilesystem":true,"runAsNonRoot":true,"runAsUser":101}` | Container-level security context configuration for Pod Security restricted profile. |
+| service.port | int | `80` | Service port exposed inside the cluster |
+| service.targetPort | int | `8080` | Target port container listens on (unprivileged nginx defaults to 8080) |
+| service.type | string | `"ClusterIP"` | Kubernetes Service type (ClusterIP, NodePort, LoadBalancer) |
+| serviceAccount.annotations | object | `{}` |  |
+| serviceAccount.create | bool | `true` |  |
+| serviceAccount.name | string | `""` |  |
+| topologySpreadConstraints | list | `[]` | Topology spread constraints to distribute Pods across zones/nodes. |
 
-Generated names are `<release>-deployment` and `<release>-service`. Selectors
-use the release's `app` label. Preserve these contracts in the helper lab so
-upgrades remain straightforward.
+----------------------------------------------
+Autogenerated from chart metadata using [helm-docs v1.14.2](https://github.com/norwoodj/helm-docs/releases/v1.14.2)

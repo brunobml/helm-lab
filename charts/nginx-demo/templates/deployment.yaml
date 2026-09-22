@@ -22,10 +22,22 @@ spec:
         {{- include "nginx-demo.labels" . | nindent 8 }}
     spec:
       serviceAccountName: {{ include "nginx-demo.serviceAccountName" . }}
+      {{- with .Values.podSecurityContext }}
+      securityContext:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.topologySpreadConstraints }}
+      topologySpreadConstraints:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
       containers:
         - name: nginx
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
           imagePullPolicy: {{ .Values.image.pullPolicy }}
+          {{- with .Values.securityContext }}
+          securityContext:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
           {{- with (include "nginx-demo.envSecretName" .) }}
           envFrom:
             - secretRef:
@@ -33,11 +45,19 @@ spec:
           {{- end }}
           ports:
             # Declares the image's default port; it does not configure the server.
-            - containerPort: 80
+            - containerPort: {{ .Values.service.targetPort | default 80 }}
           volumeMounts:
             - name: html
               mountPath: /usr/share/nginx/html
               readOnly: true
+            {{- if and .Values.securityContext .Values.securityContext.readOnlyRootFilesystem }}
+            - name: tmp
+              mountPath: /tmp
+            - name: cache
+              mountPath: /var/cache/nginx
+            - name: run
+              mountPath: /var/run
+            {{- end }}
           {{- with .Values.livenessProbe }}
           livenessProbe:
             {{- toYaml . | nindent 12 }}
@@ -61,3 +81,11 @@ spec:
         - name: html
           configMap:
             name: {{ .Release.Name }}-page
+        {{- if and .Values.securityContext .Values.securityContext.readOnlyRootFilesystem }}
+        - name: tmp
+          emptyDir: {}
+        - name: cache
+          emptyDir: {}
+        - name: run
+          emptyDir: {}
+        {{- end }}
