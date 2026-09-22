@@ -84,6 +84,7 @@ If you already completed the original fundamentals, use Labs 0–3 as a short re
 - [ ] [11. Advanced templating and library charts](labs/11-advanced-templating-and-library-charts.md) — `tpl`, `required`, `lookup`, and shared helpers
 - [ ] [12. Secrets, signing, and CI](labs/12-secrets-signing-and-ci.md) — SOPS secrets, unit tests, provenance/cosign, and chart-testing
 - [ ] [13. Capstone: a three-tier release](labs/13-capstone.md) — umbrella chart, hooks, secrets, probes, CI, and publishing
+- [ ] [14. Consuming third-party charts](labs/14-consuming-third-party-charts.md) — repositories, minimal overrides, diffing, post-rendering with Kustomize, and rollback
 
 Optional extensions after Lab 7:
 
@@ -114,6 +115,7 @@ This repository includes prebuilt, cluster-verified reference tags for every mil
 | `lab-11-complete` | Lab 11: `tpl` values, `lab-common` library chart, `extraConfigMaps`, chart `0.4.0` |
 | `lab-12-complete` | Lab 12: `secret.create` + SOPS workflow, `helm-unittest` suites, `ct` config and `ci/` scenarios, GitHub Actions workflow, chart `0.5.0` |
 | `lab-13-complete` | Lab 13: `shop` umbrella chart with `shop-api` and `shop-db`, migration hook, smoke test, unit tests |
+| `lab-14-complete` | Lab 14: Third-party chart lifecycle (`podinfo`), minimal values, `helm diff`, post-renderer Kustomize, rollback |
 | `extension-networking-complete` | Extension: Ingress and NodePort configuration |
 | `extension-health-complete` | Extension: Health probes and HorizontalPodAutoscaler (HPA v2) |
 | `extension-identity-complete` | Extension: ServiceAccount, RBAC Role/RoleBinding, and external Secrets |
@@ -128,29 +130,41 @@ See [lab-validation.md](lab-validation.md) for full cluster verification logs an
 You can approach the exercises using any of these workflows:
 
 #### Approach 1: Practice on a local branch (Recommended)
+
 Work inside this repository without modifying `main` or losing reference solutions:
+
 1. **Start from the clean scaffold:**
+
    ```bash
    git checkout -b my-learning lab-00-start
    ```
-2. Follow the lab instructions in `labs/01-first-chart.md` through `labs/13-capstone.md`.
+
+2. Follow the lab instructions in `labs/01-first-chart.md` through `labs/14-consuming-third-party-charts.md`.
 3. Test commands against your cluster and commit your progress as you complete each lab:
+
    ```bash
    git commit -am "Complete my lab 1"
    ```
+
 4. **Compare against the reference solution at any time:**
+
    ```bash
    # See how your code compares to the official solution:
    git diff lab-01-complete
    ```
+
 5. **Return to the fully completed reference anytime:**
+
    ```bash
    git checkout main
    ```
 
 #### Approach 2: Jump directly into a specific lab
+
 Want to practice a specific topic (e.g., Lab 4: Template Logic or Lab 6: ConfigMaps) without completing prior labs?
+
 1. Check out the prerequisite checkpoint into a new branch:
+
    ```bash
    # To start Lab 4, start from Lab 3's completion:
    git checkout -b practice-lab-04 lab-03-complete
@@ -158,14 +172,18 @@ Want to practice a specific topic (e.g., Lab 4: Template Logic or Lab 6: ConfigM
    # To start Lab 6, start from Lab 5's completion:
    git checkout -b practice-lab-06 lab-05-complete
    ```
+
 2. Follow the lab guide, make your changes, and test.
 3. Compare your result with the completion checkpoint:
+
    ```bash
    git diff lab-04-complete
    ```
 
 #### Approach 3: Practice in a separate folder via Git worktree (Zero conflict)
+
 If you want to keep this repo as your read-only manual while coding in an independent directory:
+
 ```bash
 # Create an isolated practice workspace pointing to the starting tag:
 git worktree add ../helm-lab-practice lab-00-start
@@ -173,14 +191,18 @@ cd ../helm-lab-practice
 
 # Work through labs, run cluster tests, and commit freely in this folder!
 ```
+
 When you are done:
+
 ```bash
 cd /home/bleite/repos/helm-lab
 git worktree remove ../helm-lab-practice
 ```
 
 #### Approach 4: Inspect solutions without editing code
+
 Inspect what changes between any two labs:
+
 ```bash
 # See the exact changes introduced in Lab 5:
 git diff lab-04-complete lab-05-complete -- charts/nginx-demo

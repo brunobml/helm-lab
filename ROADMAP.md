@@ -35,25 +35,22 @@ stay optional and are referenced by the labs that need them.
   handoff between `helm secrets` and GitOps.
 - **Needs:** cluster, Docker, and the Lab 12 tools.
 
-## Advanced track (planned)
+## Done: Lab 14, Consuming third-party charts and upgrading safely
+
+**Goal:** safely discover, inspect, override, upgrade, post-render with Kustomize, and roll back third-party charts.
+
+- **Chart:** `podinfo/podinfo` (`6.14.0` -> `6.15.0`).
+- **Exercises:** `helm repo add`/`update`/`search`, `helm show chart/readme/values`, pulling and inspecting templates, minimal delta values file vs full-copy anti-pattern, `helm diff upgrade`, `--post-renderer` with `kubectl kustomize` for corporate compliance annotations/labels, rollback rehearsal.
+- **Traps it teaches:** the floating version trap (unpinned `--version`), missing client-side schema in community charts (requiring server dry-run validation), post-renderer syntax failures blocking deployment before cluster submission.
+
+## Advanced track (in progress)
 
 Each lab below is independent of the others unless noted. Order is a recommendation, not a rule.
-
-### Lab 14: Consuming third-party charts and upgrading safely
-
-**Why:** most real-world Helm use is other people's charts.
-- Add a repo and search; `helm show values/readme/chart`; pin `--version`; install a real chart
-  (a small one, such as a Bitnami or ingress-nginx chart).
-- Override safely: minimal values file, `--set` versus `-f`, and reading the chart's templates to find what a value does.
-- **Upgrade playbook:** `helm diff` between chart versions, reading changelogs/`UPGRADE` notes,
-  handling renamed values, and rollback rehearsal.
-- **When values cannot do it:** `--post-renderer` with Kustomize, and why forking is the last resort.
-- **Break it:** upgrade across a breaking chart version; recover.
-- **Verify needs:** cluster and internet. **Risk:** upstream chart drift; pin exact versions and record them.
 
 ### Lab 15: CRDs and operators
 
 **Why:** CRDs are the most common Helm surprise.
+
 - The `crds/` directory: installed once, never upgraded or deleted by Helm. What that means in practice.
 - Patterns: separate CRD chart, CRDs applied by the pipeline, or the operator installing its own.
 - Install a real operator chart (cert-manager) and create a custom resource; ordering with hooks.
@@ -63,6 +60,7 @@ Each lab below is independent of the others unless noted. Order is a recommendat
 ### Lab 16: Production hardening and chart best practices
 
 **Why:** a chart that works is not yet a chart that is safe to run.
+
 - `securityContext` defaults that pass the Pod Security `restricted` profile (non-root, read-only root filesystem, dropped capabilities).
 - `NetworkPolicy`, `PodDisruptionBudget`, topology spread, and resource requests as chart features with tests.
 - `helm.sh/resource-policy: keep` and other lifecycle annotations.
@@ -73,6 +71,7 @@ Each lab below is independent of the others unless noted. Order is a recommendat
 ### Lab 17: Many releases: Helmfile (and Argo CD ApplicationSet)
 
 **Why:** one chart is easy; twenty releases across environments is the real job.
+
 - Helmfile: declare releases, environments, layered values, `needs:` ordering, and `helmfile diff/apply`.
 - The same fleet as an Argo CD `ApplicationSet` (for those with Argo CD from Lab 9).
 - Promotion workflow: dev to prod by changing a version, not a template.
@@ -81,6 +80,7 @@ Each lab below is independent of the others unless noted. Order is a recommendat
 ### Lab 18: Helm internals and advanced operations
 
 **Why:** understanding the machinery is what turns guesses into diagnoses.
+
 - How release state is stored (Secrets, drivers); reading a revision by hand.
 - The three-way merge: manual `kubectl edit` drift and what `helm upgrade` does about it.
 - Adopting existing resources into a release (ownership annotations, `--take-ownership`), and `--keep-history`.
