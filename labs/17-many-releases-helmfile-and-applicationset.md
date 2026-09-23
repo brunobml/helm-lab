@@ -80,6 +80,26 @@ Notice the key differences between environments:
 
 ### Step 3: Inspect layered values templates
 
+Inspect `helmfile/values/db.yaml.gotmpl`:
+
+```yaml
+secret:
+  create: true
+  password: "shop{{ .Values.environment }}password"
+persistence:
+  enabled: false
+```
+
+Inspect `helmfile/values/api.yaml.gotmpl`:
+
+```yaml
+secret:
+  create: true
+  password: "shop{{ .Values.environment }}password"
+# Note: shop-db names its service '<release>-db', which resolves to 'backend-db-db'
+dbHost: backend-db-db
+```
+
 Inspect `helmfile/values/web.yaml.gotmpl`:
 
 ```yaml
@@ -89,7 +109,8 @@ podDisruptionBudget:
 networkPolicy:
   enabled: {{ .Values.web.networkPolicy }}
 extraEnv:
-  API_URL: "http://backend-api:3000"
+  # Note: shop-api names its service '<release>-api', which resolves to 'backend-api-api'
+  API_URL: "http://backend-api-api:3000"
   ENVIRONMENT: {{ .Values.environment | quote }}
 ```
 
@@ -112,6 +133,10 @@ environments:
       - environments/prod.yaml
 
 ---
+
+helmDefaults:
+  wait: true
+  timeout: 300
 
 repositories:
   - name: podinfo
@@ -168,8 +193,8 @@ releases:
 ```
 
 > [!NOTE]
-> **Understanding `needs:` DAG Ordering:**
-> Helmfile builds a Directed Acyclic Graph (DAG) of your releases. When applying, Helmfile guarantees that `backend-db` is deployed and ready *before* `backend-api` begins installing, and `backend-api` is ready *before* `frontend-web` begins.
+> **Understanding `needs:` DAG Ordering and `wait: true`:**
+> Helmfile builds a Directed Acyclic Graph (DAG) of your releases. However, by default `needs:` orders only the sequence of `helm upgrade --install` invocations. To guarantee that `backend-db` is actually running and **Ready** before `backend-api` begins installing, `helmDefaults: { wait: true, timeout: 300 }` is specified. Without `wait: true`, Helm would fire commands sequentially without waiting for pod readiness.
 
 ---
 
@@ -361,16 +386,16 @@ What happens if a release omits `version:` or uses a floating range like `versio
 Destroy both the `dev` and `prod` release fleets cleanly using Helmfile:
 
 ```bash
-cd helmfile
+cd "$(git rev-parse --show-toplevel)/helmfile"
 helmfile -e dev destroy
 helmfile -e prod destroy
 kubectl delete namespace helm-lab-dev helm-lab-prod --ignore-not-found
 ```
 
-Verify that all releases are removed:
+Verify that all fleet releases are removed:
 
 ```bash
-helm list -A | grep helm-lab || echo "All lab releases cleanly destroyed"
+helm list -A | grep -E 'helm-lab-(dev|prod)' || echo "All lab releases cleanly destroyed"
 ```
 
 Check git status to confirm your repository is ready for checkpointing:
@@ -378,3 +403,17 @@ Check git status to confirm your repository is ready for checkpointing:
 ```bash
 git status
 ```
+
+---
+
+## Explain: deepen your understanding
+
+After completing this lab, you should be able to answer:
+
+1. Why does `needs:` in Helmfile require `helmDefaults: { wait: true }` to guarantee that dependency pods are actually Ready before dependent releases install?
+2. How do `.gotmpl` layered values files allow single charts to adapt dynamically across environments without code duplication?
+3. How does Helmfile calculate topological execution order, and what happens when circular dependencies occur?
+4. How does Argo CD ApplicationSet provide the declarative GitOps pull equivalent of Helmfile?
+
+> [!TIP]
+> See [17-many-releases-helmfile-and-applicationset-explained.md](17-many-releases-helmfile-and-applicationset-explained.md) for deep dives into Helmfile DAG sequencing, environment promotion patterns, and Argo CD ApplicationSet matrix generators.

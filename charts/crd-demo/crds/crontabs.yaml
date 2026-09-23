@@ -26,5 +26,3 @@ spec:
                   type: string
                 image:
                   type: string
-                replicas:
-                  type: integer

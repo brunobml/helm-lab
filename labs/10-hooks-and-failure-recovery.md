@@ -30,7 +30,7 @@ kind: Job
 metadata:
   name: {{ .Release.Name }}-migrate
   labels:
-    {{- include "nginx-demo.labels" . | nindent 4 }}
+    {{- include "nginx-demo.hookLabels" . | nindent 4 }}
   annotations:
     "helm.sh/hook": pre-install,pre-upgrade
     "helm.sh/hook-weight": "0"
@@ -40,7 +40,7 @@ spec:
   template:
     metadata:
       labels:
-        {{- include "nginx-demo.labels" . | nindent 8 }}
+        {{- include "nginx-demo.hookLabels" . | nindent 8 }}
     spec:
       restartPolicy: Never
       containers:
@@ -58,6 +58,11 @@ spec:
               echo "Migration complete"
 {{- end }}
 ```
+
+> [!IMPORTANT]
+> **Label Isolation for Hooks and Auxiliary Pods:**
+> In `charts/nginx-demo/templates/_helpers.tpl`, define `nginx-demo.hookLabels` (which provides standard metadata but **omits** `app: {{ .Release.Name }}`).
+> Why? The application Service selector selects on `app: {{ .Release.Name }}`. If the migration Job Pod carries that selector label, Kubernetes will register the migration pod as a ready endpoint of the Service while the migration runs! Traffic will be routed to a pod that does not serve HTTP. Always keep hook and test pod labels decoupled from application Service selectors.
 
 What the annotations mean:
 
@@ -85,16 +90,9 @@ migration:
 
 ### Step 4: Extend `charts/nginx-demo/values.schema.json`
 
-Add a `migration` entry inside the top-level `properties` object. Notice the comma `,` added after `"service": { ... }`:
+Add a `migration` entry inside the top-level `properties` object (after `"service": { ... }`):
 
 ```json
-    "service": {
-      "type": "object",
-      "properties": {
-        "type": { "type": "string", "enum": ["ClusterIP", "NodePort", "LoadBalancer"] },
-        "port": { "type": "integer", "minimum": 1, "maximum": 65535 }
-      }
-    },
     "migration": {
       "type": "object",
       "properties": {

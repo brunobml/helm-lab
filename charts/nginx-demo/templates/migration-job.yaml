@@ -4,7 +4,7 @@ kind: Job
 metadata:
   name: {{ .Release.Name }}-migrate
   labels:
-    {{- include "nginx-demo.labels" . | nindent 4 }}
+    {{- include "nginx-demo.hookLabels" . | nindent 4 }}
   annotations:
     "helm.sh/hook": pre-install,pre-upgrade
     "helm.sh/hook-weight": "0"
@@ -14,7 +14,7 @@ spec:
   template:
     metadata:
       labels:
-        {{- include "nginx-demo.labels" . | nindent 8 }}
+        {{- include "nginx-demo.hookLabels" . | nindent 8 }}
     spec:
       restartPolicy: Never
       securityContext:

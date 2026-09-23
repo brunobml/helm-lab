@@ -25,6 +25,12 @@ Let's observe this behavior hands-on using the educational `charts/crd-demo` cha
 
 ### Step 1: Inspect the demo chart structure
 
+If you are practicing on a branch from `lab-14-complete`, check out the `charts/crd-demo` starter:
+
+```bash
+git checkout lab-15-complete -- charts/crd-demo
+```
+
 Inspect `charts/crd-demo`:
 
 ```bash
@@ -35,7 +41,7 @@ ls -la charts/crd-demo/templates
 
 Notice that:
 
-- `crds/crontabs.yaml` defines the CustomResourceDefinition `crontabs.stable.example.com`.
+- `crds/crontabs.yaml` defines the CustomResourceDefinition `crontabs.stable.example.com` (currently with only `cronSpec` and `image`).
 - `templates/crontab.yaml` defines an instance of kind `CronTab` named `my-cron`.
 
 Render the chart templates locally:
@@ -76,19 +82,32 @@ Inspect the schema currently registered on the cluster:
 kubectl get crd crontabs.stable.example.com -o jsonpath='{.spec.versions[0].schema.openAPIV3Schema.properties.spec.properties}'
 ```
 
-*Expect:* `{"cronSpec":{"type":"string"},"image":{"type":"string"}}` (or schema with `replicas` depending on chart version).
+*Expect:* `{"cronSpec":{"type":"string"},"image":{"type":"string"}}`.
 
 ### Step 3: Trigger the silent CRD upgrade trap
 
-Imagine an upstream maintainer updates the chart: they add a new field `spec.replicas` to the CRD schema, and update the template to use `replicas: 3`.
+Now simulate an upstream chart update: the maintainer updates the chart files to support a new `spec.replicas` field.
 
-Simulate an upgrade where the template requests a new field:
+1. Edit `charts/crd-demo/crds/crontabs.yaml` to add `replicas` to `openAPIV3Schema.properties.spec.properties`:
+
+   ```yaml
+                   cronSpec:
+                     type: string
+                   image:
+                     type: string
+                   replicas:
+                     type: integer
+   ```
+
+2. Bump the chart version in `charts/crd-demo/Chart.yaml` to `0.2.0`.
+
+Now upgrade the release while supplying the new `replicas` value:
 
 ```bash
 helm upgrade crd-demo charts/crd-demo -n helm-lab --set crontab.replicas=3
 ```
 
-Watch the terminal carefully. You may see:
+Watch the terminal carefully. You will see:
 
 ```text
 Warning: unknown field "spec.replicas"
@@ -101,17 +120,20 @@ Now check what happened to the CRD and the Custom Resource on the cluster:
 # 1. Check if the cluster CRD was updated with the new field:
 kubectl get crd crontabs.stable.example.com -o jsonpath='{.spec.versions[0].schema.openAPIV3Schema.properties.spec.properties.replicas}'
 
-# 2. Check the live Custom Resource object:
-kubectl get crontab my-cron -n helm-lab -o yaml
+# 2. Check the live Custom Resource object on the cluster:
+kubectl get crontab my-cron -n helm-lab -o jsonpath='{.spec}'
+
+# 3. Check what Helm recorded in its release manifest:
+helm get manifest crd-demo -n helm-lab | grep replicas
 ```
 
 > [!WARNING]
 > **The Silent Drop Trap:**
 > Helm reported the upgrade as successful! However:
 >
-> 1. Helm **did not touch** the CRD schema on the cluster.
-> 2. The Kubernetes API server saw `replicas: 3` in the submitted manifest, but because the cluster CRD schema didn't recognize `replicas`, Kubernetes **silently stripped the field** (or rejected it if strict validation was active)!
-> 3. Even worse: Helm's release Secret now records that `replicas: 3` is deployed. If you fix the CRD schema later, Helm's 3-way merge patch will see no manifest change and will *not* re-apply `replicas: 3` unless the template or values change again!
+> 1. Helm **did not touch** the CRD schema on the cluster. The cluster CRD still lacks `replicas`.
+> 2. The Kubernetes API server received `replicas: 3` in the submitted manifest, but because the cluster CRD schema didn't recognize `replicas`, Kubernetes **silently stripped the field**! `kubectl get crontab` shows only `cronSpec` and `image`.
+> 3. Even worse: Helm's release Secret now records `replicas: 3`. Helm believes the field is deployed.
 
 ### Step 4: Execute the manual CRD upgrade playbook
 
@@ -130,7 +152,16 @@ kubectl get crd crontabs.stable.example.com -o jsonpath='{.spec.versions[0].sche
 
 *Expect:* `{"type":"integer"}`.
 
-Now, force Helm to re-synchronize the custom resource with an updated value:
+Now, test what happens if you re-run the upgrade with the **same** value:
+
+```bash
+helm upgrade crd-demo charts/crd-demo -n helm-lab --set crontab.replicas=3
+kubectl get crontab my-cron -n helm-lab -o jsonpath='{.spec}'
+```
+
+*Observation:* The live Custom Resource **still does not have `replicas`!** Why? Because Helm's 3-way strategic merge patch compares the newly rendered manifest (`replicas: 3`) against the last-applied release manifest (`replicas: 3`), sees zero difference, and sends nothing to the cluster!
+
+To force Helm to re-synchronize the custom resource with the updated schema, pass a changed value:
 
 ```bash
 helm upgrade crd-demo charts/crd-demo -n helm-lab --set crontab.replicas=5
@@ -225,10 +256,10 @@ kubectl get crd | grep cert-manager.io
 Inspect the annotations on one of the CRDs:
 
 ```bash
-kubectl get crd certificates.cert-manager.io -o jsonpath='{.metadata.annotations}'
+kubectl get crd certificates.cert-manager.io -o jsonpath='{.metadata.annotations.helm\.sh/resource-policy}'
 ```
 
-*Expect:* `{"helm.sh/resource-policy":"keep"}`.
+*Expect:* `keep`.
 
 ### Step 7: Create a Custom Resource and test reconciliation
 
@@ -363,9 +394,14 @@ my-umbrella/
 
 Why does this fail on a fresh cluster?
 
-- If the operator chart places CRDs in `templates/`, Helm renders and validates **all templates across all subcharts simultaneously**.
-- When Helm submits the manifests to Kubernetes, the API server rejects `issuer.yaml` because `Issuer` is not yet established!
-- Even if the operator uses `crds/`, the operator controller pod has not started yet. Any custom resource that requires immediate webhook validation or reconciliation will fail or block the release.
+- In Helm 3, Helm builds its REST mapping client-side for all resources up front before anything is applied.
+- Because `Issuer` is not yet established on the cluster API discovery, Helm aborts immediately before installing anything:
+
+```text
+Error: INSTALLATION FAILED: unable to build kubernetes objects from release manifest: resource mapping not found for name: "my-issuer" namespace: "" from "": no matches for kind "Issuer" in version "cert-manager.io/v1" ensure CRDs are installed first
+```
+
+- Even if the operator chart installs CRDs via `crds/`, the operator controller pod has not started yet. Any custom resource that requires immediate webhook validation or reconciliation will fail or block the release.
 
 **Production Solution:** Always separate operator installation from custom resource consumption into two distinct deployment steps or releases.
 
@@ -425,3 +461,17 @@ Check git status to ensure your practice working tree is ready:
 ```bash
 git status
 ```
+
+---
+
+## Explain: deepen your understanding
+
+After completing this lab, you should be able to answer:
+
+1. Why did Helm 3 design the `crds/` directory to be install-only and skip upgrades and deletions?
+2. What is the Kubernetes silent field drop, and why does Helm report success even when a Custom Resource drops new fields?
+3. Why does `helm upgrade` with the same values fail to re-apply dropped fields even after `kubectl apply -f crds/...` upgrades the CRD schema?
+4. How does `helm.sh/resource-policy: keep` protect CRDs when operators place them inside `templates/`?
+
+> [!TIP]
+> See [15-crds-and-operators-explained.md](15-crds-and-operators-explained.md) for deep architectural walkthroughs, 3-way merge desync mechanics, and production CRD migration playbooks.

@@ -257,7 +257,7 @@ Helm protects you from accidentally taking over or overwriting unmanaged cluster
 
 ### Step 2: Adopt using the `--take-ownership` flag
 
-In Helm v3.8+ (promoted and stabilized in v3.14+), Helm introduced the `--take-ownership` flag:
+In Helm v3.17+, Helm introduced the `--take-ownership` flag:
 
 ```bash
 helm install legacy-app charts/nginx-demo -n helm-internals --take-ownership
@@ -520,14 +520,24 @@ Let's simulate this failure on `internals-demo`:
 LATEST_REV=$(helm history internals-demo -n helm-internals | awk 'END{print $1}')
 SECRET_NAME="sh.helm.release.v1.internals-demo.v${LATEST_REV}"
 
-# Manually set the status label to pending-upgrade
-kubectl label secret "${SECRET_NAME}" -n helm-internals status=pending-upgrade --overwrite
+# Patch the release Secret payload to set status to pending-upgrade
+python3 - "$SECRET_NAME" <<'EOF'
+import subprocess, base64, gzip, json, sys
+s = sys.argv[1]
+raw = subprocess.check_output(["kubectl","get","secret",s,"-n","helm-internals","-o","jsonpath={.data.release}"])
+obj = json.loads(gzip.decompress(base64.b64decode(base64.b64decode(raw))))
+obj["info"]["status"] = "pending-upgrade"
+enc = base64.b64encode(base64.b64encode(gzip.compress(json.dumps(obj).encode()))).decode()
+subprocess.check_call(["kubectl","patch","secret",s,"-n","helm-internals","-p",
+  json.dumps({"data":{"release":enc},"metadata":{"labels":{"status":"pending-upgrade"}}})])
+EOF
 ```
 
-Verify that Helm thinks the release is stuck:
+Verify that Helm recognizes the release as stuck:
 
 ```bash
-helm list -n helm-internals
+# Note: plain 'helm list' filters out pending releases; use --pending or -a:
+helm list --pending -n helm-internals
 ```
 
 Notice the status is `pending-upgrade`.
@@ -556,16 +566,12 @@ helm rollback internals-demo -n helm-internals
 
 Helm rolls back the release and marks the pending revision as failed/superseded.
 
-#### Method 2: Patching or deleting the pending Secret directly
+#### Method 2: Delete the pending Secret directly
 
-If `helm rollback` is unable to proceed, you can directly edit or delete the pending Secret from Kubernetes:
+If `helm rollback` is unable to proceed, delete the pending Secret from Kubernetes:
 
 ```bash
-# Option A: Reset status label back to deployed
-kubectl label secret "${SECRET_NAME}" -n helm-internals status=deployed --overwrite
-
-# Option B: Delete the pending release Secret if it never finished applying
-# kubectl delete secret "${SECRET_NAME}" -n helm-internals
+kubectl delete secret "${SECRET_NAME}" -n helm-internals
 ```
 
 Verify that Helm commands work again:
@@ -599,3 +605,17 @@ kubectl delete namespace helm-internals
 - [ ] Inspected retained release Secrets using `helm uninstall --keep-history`.
 - [ ] Repaired a release blocked by a removed Kubernetes API using `helm-mapkubeapis`.
 - [ ] Recovered a release stuck in `pending-upgrade`.
+
+---
+
+## Explain: deepen your understanding
+
+After completing this lab, you should be able to answer:
+
+1. How does Helm encode and compress release data inside `type: helm.sh/release.v1` Secrets?
+2. How does the three-way strategic merge patch preserve out-of-band live changes while resetting managed field drift?
+3. How do `--take-ownership` and manual metadata injection resolve resource collision errors when adopting existing Kubernetes resources?
+4. How does `helm-mapkubeapis` modify release history Secrets in place to unblock upgrades when Kubernetes APIs are removed?
+
+> [!TIP]
+> See [18-helm-internals-and-advanced-operations-explained.md](18-helm-internals-and-advanced-operations-explained.md) for full architectural breakdowns of release Secret payloads, 3-way merge algorithms, and Helm 4 Server-Side Apply internals.

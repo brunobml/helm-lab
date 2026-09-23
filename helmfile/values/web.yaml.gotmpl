@@ -4,5 +4,5 @@ podDisruptionBudget:
 networkPolicy:
   enabled: {{ .Values.web.networkPolicy }}
 extraEnv:
-  API_URL: "http://backend-api:3000"
+  API_URL: "http://backend-api-api:3000"
   ENVIRONMENT: {{ .Values.environment | quote }}

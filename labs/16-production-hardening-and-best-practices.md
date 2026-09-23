@@ -75,6 +75,35 @@ securityContext:
   runAsUser: 101
 ```
 
+### Step 2b: Render security contexts in `templates/deployment.yaml` and update containerPort
+
+Values in `values.yaml` only take effect when rendered in templates. Update `charts/nginx-demo/templates/deployment.yaml`:
+
+1. Under `spec.template.spec`, add `podSecurityContext`:
+
+   ```yaml
+         {{- with .Values.podSecurityContext }}
+         securityContext:
+           {{- toYaml . | nindent 8 }}
+         {{- end }}
+   ```
+
+2. Under `spec.template.spec.containers[0]`, add `securityContext`:
+
+   ```yaml
+             {{- with .Values.securityContext }}
+             securityContext:
+               {{- toYaml . | nindent 12 }}
+             {{- end }}
+   ```
+
+3. Update the container port to use `targetPort`:
+
+   ```yaml
+             ports:
+               - containerPort: {{ .Values.service.targetPort | default 80 }}
+   ```
+
 ### Step 3: Handle `readOnlyRootFilesystem` with `emptyDir` mounts
 
 When `readOnlyRootFilesystem: true` is enabled, the container's root filesystem cannot be written to. However, NGINX requires write access to `/tmp`, `/var/cache/nginx`, and `/var/run`.
@@ -253,10 +282,10 @@ networkPolicy:
 
 Documenting chart values manually leads to stale documentation. [helm-docs](https://github.com/norwoodj/helm-docs) parses docstrings prefixed with `# --` in `values.yaml` and auto-generates Markdown tables.
 
-Run `helm-docs` using Docker:
+Run `helm-docs` using Docker (passing `--user` so generated files are owned by your current user):
 
 ```bash
-docker run --rm -v "$(pwd)/charts/nginx-demo":/helm-docs jnorwood/helm-docs:latest
+docker run --rm -v "$(pwd)/charts/nginx-demo":/helm-docs --user "$(id -u):$(id -g)" jnorwood/helm-docs:v1.14.2
 ```
 
 Inspect `charts/nginx-demo/README.md`:
@@ -265,7 +294,7 @@ Inspect `charts/nginx-demo/README.md`:
 head -45 charts/nginx-demo/README.md
 ```
 
-Notice that all descriptions, types, and defaults are automatically cataloged.
+Notice that all parameters, types, and defaults are cataloged. Parameters documented with `# -- <description>` in `values.yaml` automatically populate the Description column.
 
 ---
 
@@ -277,7 +306,7 @@ Before deploying manifests to a cluster, validate rendered templates against off
 helm template test-release charts/nginx-demo \
   --set podDisruptionBudget.enabled=true \
   --set networkPolicy.enabled=true | \
-  docker run --rm -i ghcr.io/yannh/kubeconform:latest -summary -strict -kubernetes-version 1.30.0
+  docker run --rm -i ghcr.io/yannh/kubeconform:v0.6.7 -summary -strict -kubernetes-version 1.30.0
 ```
 
 *Expect:* `Summary: 9 resources found parsing stdin - Valid: 9, Invalid: 0, Errors: 0, Skipped: 0`.
@@ -320,7 +349,7 @@ kubectl get pdb,networkpolicy -n hardened-lab
 helm test hardened-demo -n hardened-lab
 ```
 
-*Expect:* All pods running (`2/2`), PDB active, NetworkPolicy created, and `helm test` succeeds!
+*Expect:* Two Pods, each `1/1 Running`, PDB active, NetworkPolicy created, and `helm test` succeeds!
 
 ### Step 10: Break it — deploy unhardened values
 
@@ -376,9 +405,33 @@ helm uninstall hardened-demo -n hardened-lab
 kubectl delete namespace hardened-lab
 ```
 
-Bump chart version to `0.6.0` in `Chart.yaml`, run unit tests, and verify working tree:
+Bump chart version to `0.6.0` in `Chart.yaml`:
+
+```yaml
+version: 0.6.0
+```
+
+> [!NOTE]
+> **Managing Downstream Dependencies:**
+> When you bump a chart's version (`0.5.0` $\to$ `0.6.0`), any umbrella charts or downstream consumers that pin it (such as `charts/shop`) must update their dependency version constraint in `Chart.yaml` (`version: ">=0.5.0 <=0.6.0"`) and rebuild their locks (`helm dependency update charts/shop`).
+
+Run unit tests (including the hardening test suite in `tests/hardening_test.yaml`):
 
 ```bash
 helm unittest charts/nginx-demo
 git status
 ```
+
+---
+
+## Explain: deepen your understanding
+
+After completing this lab, you should be able to answer:
+
+1. Why does Pod Security admission rejection block ReplicaSets from creating new Pods while leaving existing running Pods healthy?
+2. Why does `readOnlyRootFilesystem: true` require writable `emptyDir` mounts for NGINX even when running unprivileged?
+3. How do PodDisruptionBudgets prevent service outages during voluntary cluster node drains or rolling node upgrades?
+4. Why is validating rendered manifests against OpenAPI schemas with `kubeconform` essential in CI before cluster submission?
+
+> [!TIP]
+> See [16-production-hardening-and-best-practices-explained.md](16-production-hardening-and-best-practices-explained.md) for detailed security context architectures, NetworkPolicy mechanics, and admission controller event analysis.

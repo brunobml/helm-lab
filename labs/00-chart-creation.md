@@ -33,12 +33,13 @@ ls -la charts/nginx-demo/templates
 ```
 
 Notice what Helm created:
+
 - **`Chart.yaml`**: The chart's primary metadata (name, version, description).
 - **`values.yaml`**: Default configuration values for the chart templates.
 - **`charts/`**: Directory for chart dependencies (subcharts). Empty for now.
 - **`.helmignore`**: Patterns to ignore when packaging the chart (similar to `.gitignore`).
 - **`templates/`**: A full microservice scaffold containing:
-  - `deployment.yaml`, `service.yaml`, `hpa.yaml`, `ingress.yaml`, `serviceaccount.yaml`
+  - `deployment.yaml`, `service.yaml`, `hpa.yaml`, `ingress.yaml`, `serviceaccount.yaml`, `httproute.yaml`
   - `_helpers.tpl` (template helper definitions)
   - `NOTES.txt` (post-installation usage text)
   - `tests/test-connection.yaml` (smoke test hook)
@@ -70,6 +71,7 @@ appVersion: "1.30.4"
 ```
 
 > [!NOTE]
+>
 > - **`apiVersion: v2`**: Required for Helm 3 charts (`v1` was used in Helm 2).
 > - **`type: application`**: A deployable chart (as opposed to `library`).
 > - **`version: 0.1.0`**: The version of the **chart package itself**. Must follow strict [Semantic Versioning](https://semver.org/).
@@ -152,21 +154,26 @@ helm template demo-dev ./charts/nginx-demo
 ```
 
 Expect:
-- `1 chart(s) linted, 0 chart(s) failed`
+
+- `1 chart(s) linted, 0 chart(s) failed` (the `[INFO] Chart.yaml: icon is recommended` note is expected and harmless)
 - Rendered Kubernetes YAML containing `demo-dev-deployment` (replicas: 2) and `demo-dev-service`.
 
 ---
 
 ## Break it and recover
 
-In `Chart.yaml`, temporarily change `version: 0.1.0` to an invalid SemVer value: `version: 1`.
+In `Chart.yaml`, temporarily change `version: 0.1.0` to an invalid SemVer value: `version: latest`.
 Run `helm lint ./charts/nginx-demo` and observe:
 
 ```text
-[ERROR] Chart.yaml: version "1" is not a valid SemVer
+==> Linting ./charts/nginx-demo
+[ERROR] Chart.yaml: version 'latest' is not a valid SemVer
+Error: 1 chart(s) linted, 1 chart(s) failed
 ```
 
-Helm enforces Semantic Versioning on the chart version. Restore `version: 0.1.0` and verify that `helm lint` passes again.
+*Note on YAML typing:* If you try unquoted `version: 1`, Helm fails with a YAML type error (`version should be of type string but it's of type float64`). Quoted `"1"` is coerced by Helm's SemVer parser to `1.0.0`, which is why non-numeric strings like `latest` or malformed numbers like `1.0.0.1` explicitly test SemVer validation.
+
+Restore `version: 0.1.0` and verify that `helm lint` passes again.
 
 ---
 

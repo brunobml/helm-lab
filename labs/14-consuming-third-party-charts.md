@@ -5,7 +5,7 @@
 
 Most production Helm usage involves consuming charts written and maintained by others (e.g., databases, ingress controllers, observability agents). While authoring charts teaches you the internal engine, *consuming* external charts requires a disciplined operational playbook: pinning exact versions, maintaining minimal value deltas, previewing changes with `helm diff`, patching gaps with `--post-renderer`, and knowing how to recover when upstream releases break.
 
-This lab uses [podinfo](https://github.com/stafanprodan/podinfo), a lightweight, CNCF-standard microservice chart designed to demonstrate Kubernetes and Helm patterns.
+This lab uses [podinfo](https://github.com/stefanprodan/podinfo), a lightweight, CNCF-standard microservice chart designed to demonstrate Kubernetes and Helm patterns.
 
 ---
 
@@ -172,9 +172,12 @@ Create `post-render/kustomize.sh`:
 
 ```bash
 #!/bin/bash
+set -euo pipefail
 DIR="$(cd "$(dirname "$0")" && pwd)"
-cat <&0 > "$DIR/manifests.yaml"
-kubectl kustomize "$DIR"
+TMP=$(mktemp -d); trap 'rm -rf "$TMP"' EXIT
+cp "$DIR/kustomization.yaml" "$TMP/"
+cat <&0 > "$TMP/manifests.yaml"
+kubectl kustomize "$TMP"
 ```
 
 Make the script executable:
@@ -236,8 +239,8 @@ kubectl get deployment my-podinfo -n helm-lab -o jsonpath='{.metadata.annotation
 ### Local
 
 ```bash
-helm template test podinfo/podinfo --version 6.14.0 -f values-podinfo.yaml | grep -c "kind: Deployment"
-helm template test podinfo/podinfo --version 6.14.0 -f values-podinfo.yaml --post-renderer post-render/kustomize.sh | grep -c "company.internal/audit-policy"
+helm template my-podinfo podinfo/podinfo --version 6.14.0 -f values-podinfo.yaml | grep -c "kind: Deployment"
+helm template my-podinfo podinfo/podinfo --version 6.14.0 -f values-podinfo.yaml --post-renderer post-render/kustomize.sh | grep -c "company.internal/audit-policy"
 ```
 
 ### Cluster
@@ -252,7 +255,7 @@ kubectl get pods -n helm-lab -l app.kubernetes.io/name=my-podinfo
 ## Break it and recover
 
 1. **The floating version trap:** Run `helm template my-podinfo podinfo/podinfo -f values-podinfo.yaml | grep "chart:"`. Notice that omitting `--version` pulls the latest release (`6.15.0`), which in production could silently pull a major breaking change or unvetted release. Always pin `--version`.
-2. **Post-renderer failure:** Edit `post-render/kustomization.yaml` and corrupt the patch syntax (e.g. change `op: add` to `op: invalid-op`). Run `helm template test podinfo/podinfo --version 6.15.0 --post-renderer post-render/kustomize.sh`. Notice that Helm aborts immediately with an error from the post-renderer, preventing malformed manifests from reaching the cluster. Revert the file.
+2. **Post-renderer failure:** Edit `post-render/kustomization.yaml` and corrupt the patch syntax (e.g. change `op: add` to `op: invalid-op`). Run `helm template my-podinfo podinfo/podinfo --version 6.15.0 -f values-podinfo.yaml --post-renderer post-render/kustomize.sh`. Notice that Helm aborts immediately with an error from the post-renderer, preventing malformed manifests from reaching the cluster. Revert the file.
 3. **Values type mismatch and missing schema:** Run `helm template test podinfo/podinfo -n helm-lab --version 6.15.0 --set replicaCount=two | kubectl apply --dry-run=server -f -`. Notice that because `podinfo` lacks a client-side `values.schema.json`, `helm template` silently renders invalid YAML (`replicas: two`). The error only surfaces when validated by the Kubernetes API: `cannot unmarshal string into Go struct field DeploymentSpec.spec.replicas of type int32`. This reinforces why server dry-run validation (Lab 10) is essential when consuming third-party charts.
 
 ---

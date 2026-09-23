@@ -437,7 +437,7 @@ Two behaviors to notice:
   The Deployment `include`s them to compute checksums, and helm-unittest can only resolve templates that are listed
   in `templates:`. Without them: `no template "nginx-demo/templates/secret.yaml" associated with template`.
 - `failedTemplate` matches the error text with `errorPattern` (a regex). `errorMessage` needs an *exact* match and
-  breaks on messages containing `: `.
+  breaks on messages containing `:`.
 
 <details>
 <summary>Hint: suites for the migration hook, the extra ConfigMaps, and the helm test hook</summary>
@@ -755,24 +755,37 @@ normal `ct` output.
 
 ### Step 20: See the version-bump gate
 
-`ct` compares your branch with `origin/<target-branch>`, so that ref must exist and be current
-(`git fetch origin main`, and push `main` first, otherwise your unpushed commits count as changes).
+`ct` compares your branch with `<remote>/<target-branch>` (by default `origin/main`). In your own repository fork where `main` holds your baseline progress, make sure your commits are pushed (`git push origin main`).
 
-Make sure your current lab progress is committed on your branch before testing disposable branches so uncommitted work is not lost:
+If practicing locally in this repository (where `origin/main` holds the finished chart), create a snapshot branch and a local self-remote so `ct` compares against your current progress:
 
 ```bash
-git add . && git commit -m "feat: lab 12 progress"
+# 1. Snapshot your current commit as the comparison base:
+git branch -f ct-base HEAD
+git remote add ctlocal "$(git rev-parse --show-toplevel)" 2>/dev/null || true
+git fetch ctlocal ct-base
 
+# 2. Create a disposable test branch and make a change without bumping version:
 git switch -c bump-test
 echo "# tweak" >> charts/nginx-demo/values.yaml && git commit -am "tweak values"
-ct lint --config ct.yaml
+ct lint --config ct.yaml --remote ctlocal --target-branch ct-base
 ```
 
-*Expect:* `chart version not ok. Needs a version bump!`. Bump `version` in `charts/nginx-demo/Chart.yaml`, commit, and the same
-command passes. Then discard the experiment:
+*Expect:* `chart version not ok. Needs a version bump!`.
+
+Now bump `version` in `charts/nginx-demo/Chart.yaml` (e.g. to `0.5.1`), commit, and rerun:
 
 ```bash
-git switch <your-branch> && git branch -D bump-test
+git commit -am "fix: bump chart version to 0.5.1"
+ct lint --config ct.yaml --remote ctlocal --target-branch ct-base
+```
+
+*Expect:* `All charts linted successfully`.
+
+Clean up the temporary experiment:
+
+```bash
+git switch - && git branch -D bump-test ct-base && git remote remove ctlocal
 ```
 
 ### Step 21: Wire it into GitHub Actions
@@ -881,9 +894,11 @@ ct install --config ct.yaml --charts charts/nginx-demo
 ## Break it and recover
 
 1. **Plain `helm` on an encrypted file.**
+
    ```bash
    helm template d ./charts/nginx-demo -f ./charts/nginx-demo/secrets.dev.yaml -s templates/secret.yaml | grep API_KEY
    ```
+
    *Expect:* no error, and `API_KEY: ENC[AES256_GCM,...]`. Helm does not know the file is encrypted, so it would deploy
    the **ciphertext as the password**. Always go through `helm secrets` (or decrypt in your pipeline), and add a CI check that
    a deployed value never starts with `ENC[`.
@@ -894,8 +909,13 @@ ct install --config ct.yaml --charts charts/nginx-demo
    fails the `helm test hook` suite. Restore.
 4. **Break a unit test on purpose.** Change `"%s-deployment"` to `"%s-deploy"` in `_helpers.tpl` and run `helm unittest`.
    *Expect:* the test `names the Deployment and selector after the release` fails with `Expected: shop-deployment`. Restore.
-5. **Decrypt with the wrong key.** `XDG_CONFIG_HOME=$(mktemp -d) SOPS_AGE_KEY_FILE=/dev/null helm secrets decrypt charts/nginx-demo/secrets.dev.yaml`
-   fails (SOPS defaults to `~/.config/sops/age/keys.txt`, so isolating `XDG_CONFIG_HOME` simulates an unauthorized machine without your private key). That is the intended behavior for anyone without your key.
+5. **Decrypt with the wrong key.**
+
+   ```bash
+   XDG_CONFIG_HOME=$(mktemp -d) SOPS_AGE_KEY_FILE=/dev/null sops --decrypt charts/nginx-demo/secrets.dev.yaml
+   ```
+
+   *Expect:* `Failed to get the data key required to decrypt the SOPS file` (simulating an unauthorized machine without your private age key). This demonstrates that without the correct key, the ciphertext is unreadable.
 
 ## Explain
 
