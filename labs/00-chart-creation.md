@@ -20,6 +20,7 @@ In real-world engineering, teams often run `helm create` and then **strip the te
 From your repository or practice directory root, run:
 
 ```bash
+mkdir -p charts
 helm create charts/nginx-demo
 ```
 

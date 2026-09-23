@@ -15,11 +15,13 @@ Below are in-depth explanations and answers for the questions posed in the **Exp
 ### Question 1: How do chart version, image tag, and release revision differ?
 
 #### TL;DR
+
 - **Chart Version:** The version of the Helm chart package itself (defined in `Chart.yaml`, e.g., `0.1.0`).
 - **Image Tag:** The version/identifier of the Docker/container image running inside the Pod (e.g., `nginx:1.30.4-alpine`).
 - **Release Revision:** A sequential integer managed by Helm (`1`, `2`, `3`...) that increments every time you `install`, `upgrade`, or `rollback` a specific release.
 
 #### Deep Dive & Mechanism
+
 1. **Chart Version (`Chart.yaml`):**
    - Tracks the source code of the deployment logic (the Helm templates).
    - Changing a label, adding an environment variable, or modifying resource limits requires bumping the chart version.
@@ -28,11 +30,13 @@ Below are in-depth explanations and answers for the questions posed in the **Exp
    - You can upgrade the image tag without changing the chart version (via values override), or you can change chart templates without changing the image tag.
 3. **Release Revision (Helm Cluster State):**
    - Helm stores each release's state as a versioned Kubernetes Secret in the release namespace:
+
      ```text
      sh.helm.release.v1.demo-dev.v1  (Revision 1)
      sh.helm.release.v1.demo-dev.v2  (Revision 2)
      sh.helm.release.v1.demo-dev.v3  (Revision 3 - Rollback to 1)
      ```
+
    - When you execute `helm rollback demo-dev 1`, Helm does **not** erase revision 2. Instead, it generates **revision 3**, whose manifest matches revision 1. History is append-only!
 
 ---
@@ -40,10 +44,13 @@ Below are in-depth explanations and answers for the questions posed in the **Exp
 ### Question 2: Does a successful render imply a successful rollout?
 
 #### TL;DR
+
 **No, absolutely not.** A successful render only proves that your Go template syntax is valid and produced syntactically correct YAML. It guarantees nothing about whether Kubernetes can run the workload.
 
 #### Deep Dive & Mechanism
+
 A Helm release goes through several distinct phases:
+
 1. **Client-side Rendering (`helm template`):**
    - Evaluates loops, variables, and string interpolation.
    - If a required value is missing or indentation is broken, this fails.
@@ -66,19 +73,26 @@ A Helm release goes through several distinct phases:
 ### Question 3: Which command showed the cause of the failure?
 
 #### TL;DR
+
 `kubectl describe pods -n helm-lab -l app=demo-dev`
 
 #### Deep Dive & Mechanism
+
 - When an upgrade times out, Helm will only report:
+
   ```text
   Error: UPGRADE FAILED: context deadline exceeded
   ```
+
   Helm does not know *why* the Pod failed to become ready; it only knows that the Deployment's rollout condition was not satisfied within the timeout window.
 - Running `kubectl get pods -n helm-lab` shows the high-level Pod status:
+
   ```text
   demo-dev-deployment-d9c9977d7-jk524   0/1   ImagePullBackOff   0   20s
   ```
+
 - Running `kubectl describe pod ...` inspects the **Events** section at the bottom, which reveals the exact root cause:
+
   ```text
   Events:
     Type     Reason          Message
@@ -93,10 +107,12 @@ A Helm release goes through several distinct phases:
 
 ## Break It and Recover — Detailed Walkthrough
 
-### What the challenge asks:
+### What the challenge asks
+>
 > Try an unavailable image tag with `--set-string image.tag=does-not-exist-helm-lab --wait --timeout 60s`. Expect the upgrade to time out and a new Pod to report an image-pull error. Recover by rolling back to the last successful revision.
 
 #### 1. What to Break
+
 Run `helm upgrade` pointing to an image tag that does not exist in the registry, using `--wait` and a 60-second timeout:
 
 ```bash
@@ -104,17 +120,23 @@ helm upgrade demo-dev ./charts/nginx-demo -n helm-lab --set-string image.tag=doe
 ```
 
 #### 2. The Error Observed
+
 After waiting 60 seconds, Helm aborts and returns:
+
 ```text
 Error: UPGRADE FAILED: context deadline exceeded
 ```
 
 #### 3. Diagnose the Pod Failure
+
 Check the cluster Pods:
+
 ```bash
 kubectl get pods -n helm-lab
 ```
+
 *Output:*
+
 ```text
 NAME                                   READY   STATUS             RESTARTS   AGE
 demo-dev-deployment-7bb9cf9475-x2n4p   1/1     Running            0          10m
@@ -123,57 +145,78 @@ demo-dev-deployment-556b69b9b5-4q8lp   0/1     ImagePullBackOff   0          65s
 ```
 
 Inspect the pod events:
+
 ```bash
 kubectl describe pods -n helm-lab -l app=demo-dev
 ```
+
 *Events log:*
+
 ```text
 Warning  Failed     30s (x2 over 45s)   kubelet  Failed to pull image "nginx:does-not-exist-helm-lab": rpc error: code = NotFound
 Warning  Failed     30s (x2 over 45s)   kubelet  Error: ErrImagePull
 ```
 
 Check the Helm release history:
+
 ```bash
 helm history demo-dev -n helm-lab
 ```
+
 *Output:*
+
 ```text
-REVISION    UPDATED                     STATUS    CHART               APP VERSION    DESCRIPTION
-1           ...                         superseded nginx-demo-0.1.0   1.30.4         Install complete
-2           ...                         failed     nginx-demo-0.1.0   1.30.4         Upgrade "demo-dev" failed: context deadline exceeded
+REVISION    UPDATED                     STATUS        CHART               APP VERSION    DESCRIPTION
+1           ...                         superseded    nginx-demo-0.1.0    1.30.4         Install complete
+2           ...                         superseded    nginx-demo-0.1.0    1.30.4         Upgrade complete
+3           ...                         deployed      nginx-demo-0.1.0    1.30.4         Rollback to 1
+4           ...                         failed        nginx-demo-0.1.0    1.30.4         Upgrade "demo-dev" failed: context deadline exceeded
 ```
+
 Notice that:
-- Revision 2 is marked `failed`.
-- Kubernetes rolling update paused: the old healthy Pods from Revision 1 were kept alive and serving traffic because the new Pod never became `Ready`!
+
+- Revision 4 is marked `failed`.
+- The previous good revision (Revision 3) stays in `deployed` status! Helm only marks an old revision `superseded` after a *successful* upgrade. Because Revision 4 failed, Revision 3 remained the active desired state.
+- Kubernetes rolling update paused: the old healthy Pods from Revision 3 were kept alive and serving traffic because the new Pod never became `Ready`!
 
 #### 4. How to Recover
-Roll back to the last known healthy revision (Revision 1):
+
+Roll back to the last known healthy revision (Revision 3 or 1):
+
 ```bash
-helm rollback demo-dev 1 -n helm-lab --wait --timeout 60s
+helm rollback demo-dev 3 -n helm-lab --wait --timeout 60s
 ```
+
 *Output:*
+
 ```text
 Rollback was a success! Happy Helming!
 ```
 
 #### 5. Verify Clean State
+
 Inspect the release history and Pod status:
+
 ```bash
 helm history demo-dev -n helm-lab
 kubectl get pods -n helm-lab
 ```
+
 *Output:*
+
 ```text
 REVISION    UPDATED     STATUS      CHART               APP VERSION    DESCRIPTION
-1           ...         superseded  nginx-demo-0.1.0   1.30.4         Install complete
-2           ...         failed      nginx-demo-0.1.0   1.30.4         Upgrade "demo-dev" failed
-3           ...         deployed    nginx-demo-0.1.0   1.30.4         Rollback to 1
+1           ...         superseded  nginx-demo-0.1.0    1.30.4         Install complete
+2           ...         superseded  nginx-demo-0.1.0    1.30.4         Upgrade complete
+3           ...         superseded  nginx-demo-0.1.0    1.30.4         Rollback to 1
+4           ...         failed      nginx-demo-0.1.0    1.30.4         Upgrade "demo-dev" failed
+5           ...         deployed    nginx-demo-0.1.0    1.30.4         Rollback to 3
 
 NAME                                   READY   STATUS    RESTARTS   AGE
 demo-dev-deployment-7bb9cf9475-x2n4p   1/1     Running   0          12m
-demo-dev-deployment-7bb9cf9475-z89wq   1/1     Running   0          12m
 ```
-Helm created Revision 3 (a rollback to Revision 1), terminating the broken Pod and returning the Deployment to a healthy state.
+
+Helm created Revision 5 (a rollback to Revision 3), terminating the broken Pod and returning the Deployment to a healthy state.
 
 ---
 

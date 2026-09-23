@@ -38,6 +38,14 @@ helmfile/
 
 ## Part B: Setup and Helmfile installation
 
+### Step 0: Prepare fleet files and chart dependencies
+
+Make sure the `helmfile/` directory and updated subchart manifests (`charts/shop-db` and `charts/shop-api`, which provide `secret.yaml` templates and service host wiring) are checked out from `main`:
+
+```bash
+git checkout main -- helmfile/ charts/shop-db charts/shop-api
+```
+
 ### Step 1: Install `helmfile`
 
 If `helmfile` is not already installed in your environment, install the standalone binary:
@@ -235,7 +243,38 @@ helm list -n helm-lab-dev
 kubectl get pods -n helm-lab-dev
 ```
 
-*Expect:* All four releases (`backend-db`, `backend-api`, `frontend-web`, `monitoring-probe`) are deployed.
+*Expect:* All four releases (`backend-db`, `backend-api`, `frontend-web`, `monitoring-probe`) are deployed and running `1/1`.
+
+#### End-to-end data verification
+
+In Lab 13, database seeding was automated by the umbrella chart's migration hook. When orchestrating standalone microservice releases, initialize the database schema and PostgREST anonymous role to test end-to-end data communication:
+
+```bash
+# Initialize role, table, and data in the database:
+kubectl exec -n helm-lab-dev deploy/backend-db-db -- psql -U postgres -d postgres -c "
+  DO \$\$
+  BEGIN
+    IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname = 'web_anon') THEN
+      CREATE ROLE web_anon NOLOGIN;
+    END IF;
+  END
+  \$\$;
+  GRANT USAGE ON SCHEMA public TO web_anon;
+  CREATE TABLE IF NOT EXISTS public.items (
+    id SERIAL PRIMARY KEY,
+    name TEXT NOT NULL
+  );
+  GRANT SELECT ON public.items TO web_anon;
+  INSERT INTO public.items (name) VALUES ('helmfile item') ON CONFLICT DO NOTHING;
+  NOTIFY pgrst, 'reload schema';
+"
+
+# Test the API service from a temporary curl pod:
+kubectl run test-curl --rm -i --restart=Never -n helm-lab-dev --image=curlimages/curl -- \
+  curl -s http://backend-api-api:3000/items
+```
+
+*Expect:* `[{"id":1,"name":"helmfile item"}]`. The API microservice successfully queries PostgreSQL!
 
 ---
 
@@ -274,10 +313,11 @@ helmfile -e prod diff
 
 Inspect the diff carefully. Notice that:
 
-- Target namespace is `helm-lab-prod`.
-- `frontend-web` has `replicas: 2` (scaled up from 1).
-- `frontend-web` adds `PodDisruptionBudget` (`minAvailable: 1`) and `NetworkPolicy`.
-- `monitoring-probe` is promoted from version `6.14.0` to `6.15.0`.
+- Target namespace is `helm-lab-prod` (all resources show as newly added `+` manifests in the empty target namespace).
+- In terms of environment-specific configuration differences compared to `dev`:
+  - `frontend-web` defines `replicas: 2` (scaled up from 1).
+  - `frontend-web` enables `PodDisruptionBudget` (`minAvailable: 1`) and `NetworkPolicy` (both disabled in dev).
+  - `monitoring-probe` specifies promoted version `6.15.0` (promoted from `6.14.0`).
 
 ### Step 8: Apply the production fleet
 

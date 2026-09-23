@@ -1,5 +1,7 @@
 # Lab 2 review: Release lifecycle
 
+**Full re-run (third pass):** 2026-09-23 — every step re-executed end to end on a fresh kind cluster (Kubernetes v1.35.0), from an empty workspace, with k3d spot checks (Traefik Ingress, HPA). The items below were reproduced again unless marked otherwise.
+
 **Tested with:** Helm v3.19.0, kind (Kubernetes v1.35.0), 2026-09-22
 **Result:** All commands work. The upgrade to 3 replicas, the rollback to 1, and the image-pull failure (`UPGRADE FAILED: context deadline exceeded` after about 60 s, Pod in `ErrImagePull`) behave as described. Several sample outputs on the explained page don't match what a learner who followed the lab will see.
 

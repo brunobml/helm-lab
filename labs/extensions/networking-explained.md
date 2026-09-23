@@ -60,10 +60,12 @@ Below are in-depth explanations and answers for the questions posed in the **Exp
 
 #### 1. What to Break
 
-Run `helm upgrade` setting the Ingress class to an arbitrary nonexistent name:
+Run `helm upgrade` setting the Ingress class to an arbitrary nonexistent name while maintaining dev values:
 
 ```bash
-helm upgrade demo-dev ./charts/nginx-demo -n helm-lab --set ingress.className=nonexistent --wait --timeout 120s
+helm upgrade demo-dev ./charts/nginx-demo -n helm-lab \
+  --reset-values -f ./charts/nginx-demo/values-dev.yaml \
+  --set ingress.enabled=true --set ingress.className=nonexistent --wait --timeout 120s
 ```
 
 #### 2. Observe the Ingress Resource
@@ -78,7 +80,7 @@ kubectl get ingress -n helm-lab
 
 ```text
 NAME               CLASS         HOSTS                 ADDRESS   PORTS   AGE
-demo-dev-ingress   nonexistent   chart-example.local             80      30s
+demo-dev-service   nonexistent   chart-example.local             80      30s
 ```
 
 Notice:
@@ -112,7 +114,9 @@ HTTP/1.1 404 Not Found
 Restore the valid Ingress class (e.g. `nginx` or `traefik`):
 
 ```bash
-helm upgrade demo-dev ./charts/nginx-demo -n helm-lab --set ingress.className=nginx --wait --timeout 120s
+helm upgrade demo-dev ./charts/nginx-demo -n helm-lab \
+  --reset-values -f ./charts/nginx-demo/values-dev.yaml \
+  --set ingress.enabled=true --set ingress.className=nginx --wait --timeout 120s
 ```
 
 Verify that the Ingress routes HTTP traffic:
@@ -124,7 +128,7 @@ kubectl run curl-test --image=curlimages/curl:8.5.0 --rm -i --restart=Never -- -
 *Output:*
 
 ```html
-<h1>Hello from Helm Lab</h1>
+<h1>Hello from Updated Helm Lab</h1>
 ```
 
 ---

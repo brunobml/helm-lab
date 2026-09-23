@@ -138,12 +138,13 @@ helm template demo-oci "oci://$LAB_REGISTRY/$LAB_REGISTRY_NAMESPACE/nginx-demo" 
 >   kubectl apply -n argocd --server-side --force-conflicts -f https://raw.githubusercontent.com/argoproj/argo-cd/stable/manifests/install.yaml
 >   kubectl wait -n argocd --for=condition=Available deploy --all --timeout=300s
 >
->   # Access CLI/UI:
+>   # Access CLI/UI (uses initial admin password non-interactively):
 >   kubectl port-forward -n argocd svc/argocd-server 8443:443 &
->   argocd admin initial-password -n argocd
->   argocd login localhost:8443 --username admin --insecure --grpc-web
+>   ARGOCD_PWD=$(argocd admin initial-password -n argocd | head -1)
+>   argocd login localhost:8443 --username admin --password "$ARGOCD_PWD" --insecure --grpc-web
 >   ```
 >
+> - If you do not have an external Git remote, you can serve a local Git daemon: `git daemon --export-all --base-path=. --port=9418` and use `repoURL: git://<host-ip>/helm-lab.git`.
 > - If you do not have Argo CD or an external Git remote configured, completing **Part A and Part B** fulfills all core Helm packaging and OCI registry learning objectives!
 
 For this exercise, Argo CD reads the chart from Git. Commit the chart, child
@@ -183,7 +184,7 @@ Apply it and use manual sync first:
 ```bash
 kubectl apply -f gitops/nginx-demo.yaml
 argocd app get nginx-demo
-argocd app diff nginx-demo
+argocd app diff nginx-demo || true
 argocd app sync nginx-demo
 argocd app wait nginx-demo --health --sync --timeout 120
 kubectl get deployment,service -n helm-lab-gitops
@@ -196,8 +197,24 @@ Application name here, so resources are `nginx-demo-deployment` and
 this deployment is not a release to manage with `helm upgrade` or `helm rollback`.
 
 Change the dev replica count in Git, commit, push, refresh the Application, and
-inspect its diff before syncing. Expect OutOfSync before sync and the new replica
-count afterward. Revert that Git change, push, and sync to practice recovery.
+inspect its diff before syncing:
+
+```bash
+argocd app get nginx-demo --refresh
+argocd app diff nginx-demo || true   # Note: exits 1 when differences exist
+argocd app sync nginx-demo
+```
+
+Expect OutOfSync before sync and the new replica count afterward. Revert that Git
+change, push, and sync to practice recovery.
+
+## Break it and recover
+
+Test packaging drift detection:
+
+1. Temporarily modify `pageContent` in `charts/nginx-demo/values-dev.yaml`.
+2. Notice that if you install or render from the pre-packaged archive (`helm template dist/nginx-demo-0.2.0.tgz`), Helm renders from the archive content and ignores unpacked changes made in the chart directory.
+3. Re-package with `helm package charts/nginx-demo -d dist` to update the archive before deploying. Restore `values-dev.yaml`.
 
 ## Explain
 

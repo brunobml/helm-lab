@@ -26,7 +26,14 @@ host, pathType, class, and backend port.
 After deploying your values (using your cluster's IngressClass, e.g. `traefik` for k3d/k3s or `nginx` for kind):
 
 ```bash
-helm upgrade demo-dev ./charts/nginx-demo -n helm-lab --set ingress.enabled=true --set ingress.className=nginx --wait --timeout 120s
+# If using kind without an ingress controller, install ingress-nginx:
+# helm repo add ingress-nginx https://kubernetes.github.io/ingress-nginx
+# helm upgrade --install ingress-nginx ingress-nginx/ingress-nginx -n ingress-nginx \
+#   --create-namespace --set controller.service.type=ClusterIP --wait
+
+helm upgrade demo-dev ./charts/nginx-demo -n helm-lab \
+  --reset-values -f ./charts/nginx-demo/values-dev.yaml \
+  --set ingress.enabled=true --set ingress.className=nginx --wait --timeout 120s
 kubectl get ingress -n helm-lab
 ```
 
@@ -42,10 +49,15 @@ kubectl run curl-test --image=curlimages/curl:8.5.0 --rm -i --restart=Never -- -
 
 ## Break it and recover
 
-Use the wrong ingress class (e.g. `--set ingress.className=nonexistent`), observe
-that rendering and applying still succeed but traffic is not routed by the intended
-controller, then restore the correct class. A `LoadBalancer` Service may stay
-pending on a local cluster without a cloud controller or MetalLB.
+Use the wrong ingress class with `--reset-values -f ./charts/nginx-demo/values-dev.yaml`:
+
+```bash
+helm upgrade demo-dev ./charts/nginx-demo -n helm-lab \
+  --reset-values -f ./charts/nginx-demo/values-dev.yaml \
+  --set ingress.enabled=true --set ingress.className=nonexistent --wait
+```
+
+Observe that rendering and applying still succeed, but the Ingress controller ignores the resource and traffic returns HTTP 404. Then restore the correct class using the upgrade command with `--set ingress.className=nginx` (or `traefik`). A `LoadBalancer` Service may stay pending on a local cluster without a cloud controller or MetalLB.
 
 ## Explain
 
@@ -58,6 +70,24 @@ What creates an Ingress object, and what actually handles its traffic?
 
 Disable the Ingress through a Helm upgrade, restore ClusterIP, and remove any
 controller you installed solely for this exercise. Save `extension-networking-complete`.
+
+<details>
+<summary>Hint: values.yaml configuration block</summary>
+
+```yaml
+ingress:
+  enabled: false
+  className: ""
+  annotations: {}
+  hosts:
+    - host: chart-example.local
+      paths:
+        - path: /
+          pathType: Prefix
+  tls: []
+```
+
+</details>
 
 <details>
 <summary>Hint: templates/ingress.yaml</summary>

@@ -15,15 +15,19 @@ Below are in-depth explanations and answers for the questions posed in the **Exp
 ### Question 1: Which values are visible to the child?
 
 #### TL;DR
+
 A child (subchart) only sees:
+
 1. Its own default values defined in its local `values.yaml`.
 2. Parent values explicitly namespaced under its subchart name (e.g. `lab-banner:`).
 3. Values declared under the **`global:`** key.
 The child **cannot** see any other parent values (e.g., `replicaCount`, `image`, or `service`).
 
 #### Deep Dive & Mechanism
+
 1. **Value Isolation & Encapsulation:**
    - In parent `values.yaml`:
+
      ```yaml
      replicaCount: 2
      lab-banner:
@@ -31,6 +35,7 @@ The child **cannot** see any other parent values (e.g., `replicaCount`, `image`,
      global:
        environment: "dev"
      ```
+
    - Inside `lab-banner/templates/configmap.yaml`:
      - Accessing `.Values.message` evaluates to `"Hello from the parent"` (Helm strips the `lab-banner.` prefix when passing values into the subchart context).
      - Accessing `.Values.global.environment` evaluates to `"dev"`.
@@ -44,10 +49,12 @@ The child **cannot** see any other parent values (e.g., `replicaCount`, `image`,
 ### Question 2: Why commit the lock file but ignore generated archives?
 
 #### TL;DR
+
 - **Commit `Chart.lock`:** It guarantees deterministic, reproducible builds by pinning the exact version and checksum of every dependency.
 - **Ignore `charts/*.tgz`:** Compressed archives are compiled binary build artifacts. Storing them in Git causes repository bloat and merge conflicts.
 
 #### Deep Dive & Mechanism
+
 1. **The Role of `Chart.lock`:**
    - Similar to `package-lock.json` in Node.js, `Cargo.lock` in Rust, or `poetry.lock` in Python.
    - When you declare a dependency in `Chart.yaml` with SemVer ranges (e.g., `version: ^1.2.0`), `helm dependency update` resolves the newest matching version and records its exact version, repository URL, and cryptographic digest in `Chart.lock`.
@@ -61,10 +68,12 @@ The child **cannot** see any other parent values (e.g., `replicaCount`, `image`,
 ### Question 3: When would you intentionally use `update` instead of `build`?
 
 #### TL;DR
+
 - Use **`helm dependency build`** for regular day-to-day development, CI/CD, and deployments. It strictly respects `Chart.lock`.
 - Use **`helm dependency update`** only when you intentionally want to check for, resolve, and lock **new dependency versions or update the lockfile**.
 
 #### Deep Dive & Mechanism
+
 1. **`helm dependency build` (Deterministic):**
    - Reads `Chart.lock`.
    - Downloads or packages the exact archives specified in the lockfile into the `charts/` folder.
@@ -82,10 +91,12 @@ The child **cannot** see any other parent values (e.g., `replicaCount`, `image`,
 
 ## Break It and Recover — Detailed Walkthrough
 
-### What the challenge asks:
+### What the challenge asks
+>
 > Delete only the generated `charts/nginx-demo/charts/lab-banner-0.1.0.tgz`, keeping the source chart and lock file. Try rendering, observe the missing-dependency error, then recover with `helm dependency build`.
 
 #### 1. What to Break
+
 Simulate cloning a fresh Git repository (where generated `charts/*.tgz` archives are gitignored) by deleting the packaged subchart archive:
 
 ```bash
@@ -93,36 +104,46 @@ rm -f charts/nginx-demo/charts/lab-banner-0.1.0.tgz
 ```
 
 #### 2. Run the Command
+
 Attempt to render the parent chart:
+
 ```bash
 helm template demo-dev ./charts/nginx-demo
 ```
 
 #### 3. The Error Observed
+
 ```text
 Error: found in Chart.yaml, but missing in charts/ directory: lab-banner
 ```
 
 #### 4. Why This Failed
+
 - When Helm inspects `Chart.yaml` and `Chart.lock`, it validates that every declared dependency exists as a packaged `.tgz` archive or directory inside the chart's `charts/` directory.
 - Unlike tools like `npm` or `pip`, `helm template` and `helm install` will **not** automatically download or package missing dependencies on the fly.
 - If dependencies are missing from `charts/`, Helm halts immediately to prevent deploying an incomplete or broken release.
 
 #### 5. How to Recover
+
 Rebuild the dependencies strictly from the pinned `Chart.lock`:
+
 ```bash
 helm dependency build ./charts/nginx-demo
 ```
+
 *Output:*
+
 ```text
 Getting lab-banner 0.1.0 from source chart
 Saving 1 charts to charts/
 ```
 
 Verify that rendering works again:
+
 ```bash
 helm template demo-dev ./charts/nginx-demo | grep -A 5 "kind: ConfigMap"
 ```
+
 *Output:*
 Both the subchart's `demo-dev-banner` ConfigMap and the parent's `demo-dev-page` ConfigMap render cleanly.
 

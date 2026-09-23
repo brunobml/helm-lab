@@ -1,5 +1,8 @@
 # Lab 8 review: Dependencies
 
+**Full re-run (third pass):** 2026-09-23 — every step re-executed end to end on a fresh kind cluster (Kubernetes v1.35.0), from an empty workspace, with k3d spot checks (Traefik Ingress, HPA). The items below were reproduced again unless marked otherwise.
+**B2 is withdrawn** (see below).
+
 **Tested with:** Helm v3.19.0, kind (Kubernetes v1.35.0), 2026-09-22
 **Result:** Every step works:
 
@@ -17,9 +20,9 @@ My files match `lab-08-complete`.
 Explained Q2: "It guarantees deterministic, reproducible builds by pinning the exact version **and checksum** of every dependency."
 The `digest:` in `Chart.lock` is a hash of the dependency *declarations* (the `dependencies:` list in `Chart.yaml` + lock), **not** a hash of each dependency's contents. The lab itself states this correctly ("A local lock is not a content hash for every source file"), so the two pages contradict each other. Integrity of remote chart contents comes from provenance/signatures (Lab 12), not from `Chart.lock`.
 
-### B2: The repository contradicts the lesson about ignored archives (medium)
+### ~~B2~~ (withdrawn): The archives on `main` are **not** tracked
 
-The lab says "Generated `.tgz` files are ignored", and `.gitignore` has `*.tgz`. But `main` **tracks** `charts/nginx-demo/charts/lab-banner-0.1.0.tgz` and `lab-common-0.1.0.tgz` (they must have been force-added). A learner comparing against `main` sees the opposite of what the lab teaches. Either `git rm --cached` them on `main`, or explain why the reference branch keeps them (for example so the finished chart renders without `helm dependency build`).
+My first review said `main` tracks `charts/nginx-demo/charts/*.tgz`. That was wrong: the files existed on disk as git-ignored build output. `git ls-tree -r b2c7374` and `HEAD` contain no `.tgz` files, so the repository already matches the lesson.
 
 ## Accuracy issues
 

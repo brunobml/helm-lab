@@ -73,6 +73,7 @@ Add the schema definition:
 ```
 
 **Key rules to understand:**
+
 - **Explicit `required`:** In JSON Schema, specifying a property type does **not** make it required. You must list required field names in the `"required": [...]` array.
 - **Top-level properties:** Notice that `"additionalProperties": false` is omitted. This allows additional top-level keys (`extraEnv`, `resources`, `pageContent`, and future lab features) without schema errors.
 - **Port boundaries:** Restricts `port` and `targetPort` between `1` and `65535`, preventing invalid TCP port configurations.
@@ -109,6 +110,7 @@ spec:
 ```
 
 **Key rules to understand:**
+
 - **`helm.sh/hook: test`:** Marks this Pod as an integration test hook. Helm will NOT deploy it during `helm install` or `upgrade`; it only deploys when you invoke `helm test`.
 - **`helm.sh/hook-delete-policy: before-hook-creation`:** Deletes any previous test Pod before creating a new one. This keeps test logs available for inspection via `--logs` after the test finishes (unlike `hook-succeeded`, which deletes the Pod immediately and breaks `--logs`).
 - **No selector labels:** Notice the test Pod does **not** have the selector label `app: {{ .Release.Name }}`. Test Pods must never become endpoints in the application Service!
@@ -127,6 +129,7 @@ Create `charts/nginx-demo/templates/NOTES.txt`. Helm displays this file to opera
 ```
 
 **Why dynamic templating matters:**
+
 - `{{ .Release.Namespace }}` injects the actual namespace where the release was installed.
 - `{{ include "nginx-demo.serviceName" . }}` outputs the exact Service name (`demo-dev-service`).
 - `{{ .Values.service.port }}` outputs the configured listening port.
@@ -136,6 +139,7 @@ Create `charts/nginx-demo/templates/NOTES.txt`. Helm displays this file to opera
 ## Verify
 
 ### 1. Test schema validation with valid values
+
 Run the linter against the default chart, dev profile, and prod profile:
 
 ```bash
@@ -143,60 +147,82 @@ helm lint ./charts/nginx-demo
 helm lint ./charts/nginx-demo -f ./charts/nginx-demo/values-dev.yaml
 helm lint ./charts/nginx-demo -f ./charts/nginx-demo/values-prod.yaml
 ```
+
 *Expect:* All three pass with `0 chart(s) failed`.
 
 ### 2. Test fail-fast schema rejection with invalid values
+
 Test invalid negative replica count:
+
 ```bash
 helm template demo-dev ./charts/nginx-demo --set replicaCount=-1
 ```
+
 *Expect error:*
+
 ```text
 Error: values don't meet the specifications of the schema(s) in the following chart(s):
 nginx-demo:
-- replicaCount: Must be greater than or equal to 0
+- at '/replicaCount': minimum: got -1, want 0
 ```
 
 Test invalid TCP port number:
+
 ```bash
 helm template demo-dev ./charts/nginx-demo --set service.port=70000
 ```
+
 *Expect error:*
+
 ```text
 Error: values don't meet the specifications of the schema(s) in the following chart(s):
 nginx-demo:
-- service.port: Must be less than or equal to 65535
+- at '/service/port': maximum: got 70,000, want 65,535
 ```
 
 ### 3. Deploy and test the live application
+
 Deploy the release using dev values:
+
 ```bash
 helm upgrade demo-dev ./charts/nginx-demo -n helm-lab --reset-values -f ./charts/nginx-demo/values-dev.yaml --wait --timeout 120s
 ```
 
 Run the in-cluster HTTP test suite:
+
 ```bash
 helm test demo-dev -n helm-lab --logs --timeout 60s
 ```
+
 *Expect output:*
+
 ```text
-RUNNING: demo-dev-http-test
-[demo-dev-http-test] <h1>Hello from Helm Lab</h1>
-PASSED:  demo-dev-http-test
+TEST SUITE:     demo-dev-http-test
+Last Started:   ...
+Last Completed: ...
+Phase:          Succeeded
+POD LOGS: demo-dev-http-test
+<h1>Hello from Updated Helm Lab</h1>
+<p>I changed this page with helm upgrade.</p>
 ```
 
 Inspect release status and verify `NOTES.txt` rendering:
+
 ```bash
 helm status demo-dev -n helm-lab
 ```
+
 *Expect:* `NOTES:` section displays the rendered port-forward instructions with `demo-dev-service` and port `80`.
 
 ## Break it and recover
 
-Temporarily change the test's URL to a nonexistent Service. Upgrade and run the
-test; expect failure. Inspect the retained test Pod with `kubectl logs`, correct
-the URL, upgrade, and rerun. A Helm test failure does not automatically roll back
-the application release.
+1. Temporarily change the test's URL in `charts/nginx-demo/templates/tests/http.yaml` to a nonexistent service:
+   `http://does-not-exist:{{ .Values.service.port }}/`
+2. Run `helm upgrade demo-dev ./charts/nginx-demo -n helm-lab --reset-values -f ./charts/nginx-demo/values-dev.yaml`
+   *(Note: You must run `helm upgrade` because Helm test hooks are stored inside the release manifest in the cluster; editing the file alone does not update the hook).*
+3. Run `helm test demo-dev -n helm-lab --logs`:
+   *Expect:* `Phase: Failed` and `Error: 1 error occurred: * pod demo-dev-http-test failed`. Logs show `wget: bad address 'does-not-exist:80'`.
+4. Restore `templates/tests/http.yaml` to `http://{{ include "nginx-demo.serviceName" . }}:{{ .Values.service.port }}/`, upgrade, and rerun `helm test`. It passes! Notice that a test failure does not automatically roll back the application release.
 
 ## Explain
 

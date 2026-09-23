@@ -39,6 +39,7 @@ Open `charts/nginx-demo/templates/deployment.yaml`. Inside the container definit
 ```
 
 **How this works:**
+
 - `{{- with .Values.extraEnv }}`: Only renders the `env:` block if `extraEnv` is non-empty. Inside this block, `.` changes from root context to `.Values.extraEnv`.
 - `{{- range $name, $value := . }}`: Iterates over the key-value map.
 - `{{ $value | quote }}`: Enforces string values (`"false"`, `"dev"`) required by the Kubernetes `v1.EnvVar` specification.
@@ -64,28 +65,36 @@ resources:
 ## Verify
 
 1. **Lint chart syntax:**
+
    ```bash
    helm lint ./charts/nginx-demo
    ```
 
 2. **Verify defaults omit `env` and `resources`:**
+
    ```bash
    helm template demo-dev ./charts/nginx-demo
    ```
+
    *Expect:* Manifest contains `ports:`, but neither `env:` nor `resources:`.
 
 3. **Verify dev values render `env` and `resources`:**
+
    ```bash
    helm template demo-dev ./charts/nginx-demo -f ./charts/nginx-demo/values-dev.yaml
    ```
+
    *Expect:* Container section includes `env:` with `LAB_NAME="dev"` and `FEATURE_ENABLED="false"`, and `resources:` with CPU and memory limits/requests.
 
 4. **Apply changes to cluster and inspect runtime Pod:**
+
    ```bash
    helm upgrade demo-dev ./charts/nginx-demo -n helm-lab --reset-values -f ./charts/nginx-demo/values-dev.yaml --wait --timeout 120s
    kubectl exec -n helm-lab deployment/demo-dev-deployment -- printenv LAB_NAME FEATURE_ENABLED
    ```
+
    *Expect output:*
+
    ```text
    dev
    false

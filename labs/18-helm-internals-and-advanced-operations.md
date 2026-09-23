@@ -1,6 +1,6 @@
 # Lab 18: Helm internals and advanced operations
 
-**Start:** Lab 17 complete (`lab-17-complete`). An active Kubernetes cluster with Helm v3.14+ installed and the `helm-diff` plugin.
+**Start:** Lab 17 complete (`lab-17-complete`). An active Kubernetes cluster with Helm v3.17+ installed and the `helm-diff` plugin.
 **Goal:** Master Helm's internal architecture and advanced operational recovery: inspect and decode release Secrets by hand, understand three-way strategic merge patch and live drift behavior, adopt unmanaged Kubernetes resources into a Helm release using `--take-ownership` and manual metadata, recover releases blocked by deprecated/removed Kubernetes APIs with `mapkubeapis`, and prepare charts for Helm 4's Server-Side Apply (SSA).
 
 ---
@@ -277,6 +277,10 @@ Output:
     meta.helm.sh/release-namespace: helm-internals
 ```
 
+> [!WARNING]
+> **Adoption Transfers Lifecycle Ownership:**
+> Once an unmanaged resource is adopted into a Helm release, Helm assumes complete lifecycle management over it. If you later execute `helm uninstall <release>`, Kubernetes will delete the adopted resource along with the release unless it has been annotated with `"helm.sh/resource-policy": "keep"`. Furthermore, Helm reconciles the adopted resource's specification to match the chart's template (e.g. rewriting Service selectors to match the release's Pods).
+
 ### Step 3: Manual adoption via `kubectl` metadata injection
 
 If you are running in CI or automation where `--take-ownership` is restricted, you can adopt resources by adding the labels and annotations before running Helm:
@@ -484,13 +488,15 @@ The upgrade succeeds cleanly!
 
 ## Part E: Helm 3 vs. Helm 4 Architecture & Evolution
 
-| Architecture Feature | Helm 3 | Helm 4 (Upcoming / Design Proposals) |
+| Architecture Feature | Helm 3 | Helm 4 |
 | :--- | :--- | :--- |
 | **Apply Engine** | Client-Side 3-Way Strategic Merge Patch | Kubernetes Server-Side Apply (SSA) |
-| **Field Management** | Helm calculates client diff; Last-write-wins | `fieldManager=helm`; Conflicts rejected if owned by other controllers |
-| **CRD Upgrades** | CRDs in `crds/` ignored on upgrade | Native CRD upgrade support via SSA |
-| **Failure Flags** | `--atomic` / `--cleanup-on-fail` | Replaced/streamlined (e.g. `--rollback-on-failure`) |
-| **Chart Repository Format** | HTTP Index (`index.yaml`) + OCI experimental | OCI-native primary; legacy HTTP repositories deprecated |
+| **Field Management** | Helm calculates client diff; Last-write-wins | `fieldManager=helm`; Conflicts detected via Kubernetes `managedFields` |
+| **CRD Upgrades** | CRDs in `crds/` ignored on upgrade | Server-Side Apply allows managing CRDs declaratively |
+| **Failure Flags** | `--atomic` / `--cleanup-on-fail` | Streamlined flags (e.g. `--rollback-on-failure`) |
+| **Force Flag** | `--force` | Replaced by `--force-replace` |
+| **Post-rendering** | Executable binary only | Plugin-based post-renderers supported |
+| **Chart Repositories** | HTTP Index (`index.yaml`) + OCI | First-class OCI registries + classic HTTP repositories |
 
 ### What Server-Side Apply (SSA) means for chart authors
 
@@ -556,29 +562,37 @@ Error: UPGRADE FAILED: another operation (install/upgrade/rollback) is in progre
 
 ### Diagnose and recover
 
-#### Method 1: Roll back to the previous healthy revision (Recommended)
+When a release is stuck in `pending-upgrade`, choose one of the following two alternative recovery strategies:
 
-If a previous stable revision exists:
+#### Option A: Roll back to the previous healthy revision (Standard Helm command)
+
+When a previous stable revision exists in release history, use `helm rollback` to revert the stuck transaction:
 
 ```bash
 helm rollback internals-demo -n helm-internals
 ```
 
-Helm rolls back the release and marks the pending revision as failed/superseded.
-
-#### Method 2: Delete the pending Secret directly
-
-If `helm rollback` is unable to proceed, delete the pending Secret from Kubernetes:
+Helm rolls back the release to the previous good revision and updates the pending revision's status. Verify recovery:
 
 ```bash
-kubectl delete secret "${SECRET_NAME}" -n helm-internals
+helm list -n helm-internals
 ```
 
-Verify that Helm commands work again:
+#### Option B: Delete the pending Secret directly (Manual recovery)
+
+If `helm rollback` is blocked or unavailable (for example, if the initial install failed into `pending-install`), delete the stuck transaction Secret directly from Kubernetes.
+
+*(Note: If you already ran Option A above, re-run the python patch snippet to put the release back into `pending-upgrade` first before testing Option B).*
 
 ```bash
+# Delete the pending Secret:
+kubectl delete secret "${SECRET_NAME}" -n helm-internals
+
+# Verify the release can now be upgraded cleanly:
 helm upgrade internals-demo charts/nginx-demo -n helm-internals --set replicaCount=1
 ```
+
+*(Note: In `helm history`, you may see the superseded or skipped revision numbers. Helm revisions are monotonically increasing sequence numbers and do not need to be consecutive).*
 
 The release upgrades successfully!
 

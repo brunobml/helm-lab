@@ -325,9 +325,16 @@ port-forward command with that Service port. Stop port-forwarding with Ctrl+C.
 2. Render the Deployment locally using the command from Step 3.
 3. Look at `spec.selector.matchLabels`. It now asks for both the `app` label and
    a specific version. This differs from the existing Deployment's selector.
-4. **Do not upgrade this experimental version.** Remove the added line from
-   `selectorLabels`, leaving the original version line in `nginx-demo.labels`.
-5. Render again. Confirm that `matchLabels` is back to only `app: demo-dev`.
+4. **Do not upgrade this experimental version.** You can safely test how Kubernetes would react using a server-side dry run without modifying the cluster:
+
+   ```bash
+   helm template demo-dev ./charts/nginx-demo -f ./charts/nginx-demo/values-dev.yaml \
+     --show-only templates/deployment.yaml | kubectl apply --dry-run=server -n helm-lab -f -
+   ```
+
+   *Expect:* `field is immutable`.
+5. Remove the added line from `selectorLabels`, leaving the original version line in `nginx-demo.labels`.
+6. Render again. Confirm that `matchLabels` is back to only `app: demo-dev`.
 
 The lesson: Helm can produce valid YAML that Kubernetes would reject as an
 update to an existing object.
@@ -352,6 +359,9 @@ Try answering before opening the answers:
    accidentally asking Helm to replace resources while reorganizing template code.
 
 </details>
+
+> [!TIP]
+> See [05-helpers-and-labels-explained.md](05-helpers-and-labels-explained.md) for in-depth architectural breakdowns of helper namespacing, selector immutability, and labels design.
 
 ## Finish
 

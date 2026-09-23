@@ -1,69 +1,44 @@
 # Lab 15 review: CRDs and operators
 
-**Tested with:** Helm v3.19.0, cert-manager chart v1.16.2 (the repo's latest is v1.21.2), kind (Kubernetes v1.35.0), 2026-09-23
-**Result:** Part B (cert-manager) and Part C Trap 1 reproduce exactly:
+**Full re-run (third pass):** 2026-09-23 — every step re-executed end to end on a fresh kind cluster (Kubernetes v1.35.0), from an empty workspace, with k3d spot checks (Traefik Ingress, HPA). The items below were reproduced again unless marked otherwise.
 
-- 3 Pods and 6 CRDs, with the `keep` annotation.
-- The Certificate reaches `READY True`, and the TLS Secret is created.
-- Uninstall prints the "kept due to the resource policy" list.
-- The CRDs, Certificate, and Secret survive.
-- Trap 1: `the server could not find the requested resource (post issuers.cert-manager.io)`.
+**Re-validated:** 2026-09-23 against `44d3404` (Helm v3.19.0, kind v1.35.0). Re-run from the Lab 14 state.
 
-**Part A (the lab's core lesson) can't be done as written.** The chart it depends on isn't provided, and the chart in the tag makes the trap impossible to observe.
+**Fixed and verified (with `main`'s `charts/crd-demo`):** Part A now reproduces every claim exactly:
 
-## Bugs
+- the initial schema `{"cronSpec":...,"image":...}`
+- after editing the CRD and upgrading: `Warning: unknown field "spec.replicas"`, the CR shows `{"cronSpec":"...","image":"busybox:latest"}`, and `helm get manifest` shows `replicas: 3`
+- after `kubectl apply` of the CRD, an upgrade with the **same** value still leaves `replicas` absent, and changing to `5` makes it appear
+- uninstall deletes the CR and keeps the CRD
 
-### B1: `charts/crd-demo` doesn't exist at the lab's starting point, and the lab never provides it (high)
+The new `keep` jsonpath, the Trap 2 error text, and the Explain section with its link are also good.
 
-The lab starts from `lab-14-complete` and says "Inspect `charts/crd-demo`". But:
+## New bug
 
-- `git ls-tree lab-14-complete` has **no** `charts/crd-demo`.
-- The lab contains **no** file contents for it (unlike Labs 8, 11, and 13, which spell out every file).
+### N1: The new Step 1 checkout pulls the **old** chart, so the trap disappears again (high)
 
-A learner following the path gets `ls: cannot access 'charts/crd-demo'`. The only way forward is `git checkout lab-15-complete -- charts/crd-demo`, which the lab never mentions.
-**Fix:** Add a "Step 0: create the demo chart" with the 5 files (Chart.yaml, values.yaml, crds/crontabs.yaml, templates/crontab.yaml, NOTES.txt), or tell learners to check it out from the tag.
+Step 1 now says:
 
-### B2: The shipped CRD already contains `replicas`, so the "Silent Drop Trap" never happens (high)
-
-`charts/crd-demo/crds/crontabs.yaml` (tag `lab-15-complete`, chart 0.2.0) already defines `spec.replicas: {type: integer}`. Following Steps 2–3 as written:
-
-- Step 2's schema check shows `{"cronSpec":...,"image":...,"replicas":{"type":"integer"}}`. The lab hedges with "(or schema with `replicas` depending on chart version)".
-- Step 3's `--set crontab.replicas=3` **works fine**, with no warning, and the live CR has `"replicas":3`.
-
-So the warning box ("Helm reported success... Kubernetes silently stripped the field") describes something the learner never sees, and Step 4's "manual CRD upgrade playbook" has nothing to fix.
-
-**Verified that the lesson itself is correct.** When I pre-installed a v1 CRD **without** `replicas` and then ran the lab's commands:
-
-```text
-helm upgrade ... --set crontab.replicas=3
-  → Warning: unknown field "spec.replicas"
-  → Release "crd-demo" has been upgraded. Happy Helming!
-kubectl get crontab my-cron -o jsonpath='{.spec}'      → {"cronSpec":"...","image":"busybox:latest"}    (dropped)
-helm get manifest crd-demo | grep replicas             → replicas: 3                                     (Helm thinks it's there)
-kubectl apply -f charts/crd-demo/crds/crontabs.yaml    → configured
-helm upgrade ... --set crontab.replicas=3  (same value) → CR still has NO replicas   (3-way merge sees no change)
-helm upgrade ... --set crontab.replicas=5              → {"...","replicas":5}
+```bash
+git checkout lab-15-complete -- charts/crd-demo
 ```
 
-Every claim in the warning box is confirmed, including the subtle "same value won't re-apply" point (which deserves its own explicit step, because it's the most valuable insight in the lab).
+The `lab-15-complete` tag was **not moved**. It still has chart 0.2.0 with `replicas` in the CRD and `replicas: 1` in values. Verified by following the lab verbatim:
 
-**Fix:** Ship the chart as **0.1.0 without `replicas`** in the CRD, and without `replicas` in `values.yaml` (the current default `replicas: 1` is rendered even on the first install). Then have Step 3 *edit* the CRD file (the "upstream maintainer" change) and bump to 0.2.0. That also shows directly that `helm upgrade` ignores `crds/`.
+```text
+Step 2 schema: {"cronSpec":{"type":"string"},"image":{"type":"string"},"replicas":{"type":"integer"}}
+Step 3 upgrade: no warning; CR = {"cronSpec":"...","image":"busybox:latest","replicas":3}
+```
 
-### B3: Lab 15 has no "Break it", "Explain", or link to its explained page (medium)
+That contradicts Step 2's new `*Expect:*` line and the whole warning box.
+**Fix:** Either `git checkout main -- charts/crd-demo`, or move the tag: `git tag -f lab-15-complete <commit with the 0.1.0 chart>` (and force-push tags). Moving the tag also brings `git diff lab-15-complete` back in line. Note, though, that the tag's chart should be the **end-of-lab** state (0.2.0 with `replicas`, after Step 3's edit), while the starter should be 0.1.0, so a separate `lab-15-start` path or `main` is the cleaner source.
 
-Every other lab ends with Explain questions and a `> [!TIP] See ...-explained.md` link. Lab 15 has neither, so learners won't find `15-crds-and-operators-explained.md`. The explained page is organized by topic ("Why Helm releases and CRDs clash", "Pattern 1/2/3") rather than questions, so either add matching questions to the lab or just link it.
+## Still open (minor)
 
-## Accuracy issues
+- **New N2:** Step 4's `kubectl apply -f charts/crd-demo/crds/crontabs.yaml` prints `Warning: resource customresourcedefinitions/crontabs.stable.example.com is missing the kubectl.kubernetes.io/last-applied-configuration annotation ...`, because Helm created the CRD. It's harmless, so say so, or use `kubectl apply --server-side`.
 
-- **I1:** Step 6 expects the CRD annotations to be `{"helm.sh/resource-policy":"keep"}`. Actual: `{"helm.sh/resource-policy":"keep","meta.helm.sh/release-name":"cert-manager","meta.helm.sh/release-namespace":"cert-manager"}`. Use `jsonpath='{.metadata.annotations.helm\.sh/resource-policy}'` to print just `keep`.
-- **I2:** cert-manager **v1.16.2** is several minors behind (the repo's current version is v1.21.2). Pinning is correct, but note the date, or bump. Also mention `crds.keep: true` (the default), which is what adds the annotation. The lab attributes it to `crds.enabled` alone.
-- **I3:** Step 8 doesn't mention that the kept CRDs still carry `meta.helm.sh/release-name: cert-manager`. Reinstalling with the **same** release name re-adopts them. A *different* release name fails with the ownership error from the Lab 3 review B2. That's worth a line, since it's the next thing that goes wrong in real clusters.
-- **I4:** Part C Trap 2 says "Helm renders and validates **all templates across all subcharts simultaneously**... the API server rejects `issuer.yaml`". In Helm 3, the failure usually occurs **client-side before anything is applied** because Helm builds its REST mapping for all resources up front. Verified with a one-template chart:
-  `Error: INSTALLATION FAILED: unable to build kubernetes objects from release manifest: resource mapping not found for name: "x" namespace: "" from "": no matches for kind "Issuer" in version "cert-manager.io/v1" ensure CRDs are installed first`.
-  Quote this real message; nothing is applied, so there's no half-installed release to clean up.
-
-## Ease-of-following suggestions
-
-- **S1:** Step 5 cleanup and the final cleanup both delete the demo CRD. Also add `helm uninstall crd-demo` output expectations (the CR is deleted, the CRD kept), which I confirmed.
-- **S2:** The Verify section only checks `helm template` behavior (no cluster). Add a check for the key lesson, for example that after an upgrade the CRD schema is unchanged unless it was `kubectl apply`'d.
-- **S3:** Part B's Step 7 `sleep`-free check can race: the Certificate is `READY False` for a few seconds. Suggest `kubectl wait --for=condition=Ready certificate/lab-demo-tls -n helm-lab --timeout=60s`.
+- **I2:** cert-manager v1.16.2 is pinned while the repo's current version is v1.21.2. Also mention `crds.keep: true` (the default), which is what adds the `keep` annotation.
+- **I3:** Step 8: the kept CRDs still carry `meta.helm.sh/release-name: cert-manager`. Reinstalling under a different release name fails with the ownership error.
+- **S2:** Verify still only checks `helm template` behavior. Add a check for the CRD-not-upgraded lesson.
+- **S3:** Step 7: use `kubectl wait --for=condition=Ready certificate/lab-demo-tls -n helm-lab --timeout=60s` instead of checking immediately.
+- The Explain questions are good, but `15-crds-and-operators-explained.md` is organized by topic (sections 1–6), not by those 4 questions. Consider mapping each question to a section.

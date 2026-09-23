@@ -15,22 +15,60 @@
 ## Verify
 
 Render with autoscaling both off and on. Expect replicas only when off and HPA
-only when on. Upgrade with probes and inspect:
+only when on.
+
+Deploy probes to the dev release:
+
+```bash
+# If resource metrics are not yet installed on kind:
+# helm repo add metrics-server https://kubernetes-sigs.github.io/metrics-server/
+# helm upgrade --install metrics-server metrics-server/metrics-server -n kube-system --set args={--kubelet-insecure-tls}
+
+helm upgrade demo-dev ./charts/nginx-demo -n helm-lab \
+  --reset-values -f ./charts/nginx-demo/values-dev.yaml \
+  --set readinessProbe.httpGet.path=/ \
+  --set readinessProbe.httpGet.port=80 \
+  --set livenessProbe.httpGet.path=/ \
+  --set livenessProbe.httpGet.port=80
+```
+
+Inspect the deployed probes:
 
 ```bash
 kubectl describe deployment demo-dev-deployment -n helm-lab
-kubectl get pods -n helm-lab
-kubectl top pods -n helm-lab
+kubectl get pods -n helm-lab -l app=demo-dev
+kubectl top pods -n helm-lab -l app=demo-dev
 ```
 
 After enabling HPA, inspect `kubectl get hpa -n helm-lab`. Metrics must be
 available before you expect useful scaling behavior. Apply controlled load in
-your local cluster and observe replicas within configured min/max bounds.
+your local cluster and observe replicas scale up:
+
+```bash
+kubectl run load -n helm-lab --image=busybox:1.36 --restart=Never -- \
+  sh -c 'while true; do wget -q -O- http://demo-dev-service >/dev/null; done'
+kubectl get hpa -n helm-lab -w
+```
 
 ## Break it and recover
 
-Set the readiness probe path to a missing page. Observe a running but unready
-Pod and unavailable Service endpoints. Restore `/` and verify readiness.
+Set the readiness probe path to a missing page:
+
+```bash
+helm upgrade demo-dev ./charts/nginx-demo -n helm-lab \
+  --reset-values -f ./charts/nginx-demo/values-dev.yaml \
+  --set readinessProbe.httpGet.path=/missing.html --wait=false
+```
+
+Observe that during a rolling update, the new Pod runs but stays unready (`0/1 Running`), while the old Pod continues to serve traffic. Then restore `/` and verify readiness:
+
+```bash
+helm upgrade demo-dev ./charts/nginx-demo -n helm-lab \
+  --reset-values -f ./charts/nginx-demo/values-dev.yaml \
+  --set readinessProbe.httpGet.path=/ \
+  --set readinessProbe.httpGet.port=80 \
+  --wait
+```
 
 ## Explain
 
@@ -58,6 +96,10 @@ spec:
       containers:
         - name: nginx
           ...
+          {{- with .Values.startupProbe }}
+          startupProbe:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
           {{- with .Values.livenessProbe }}
           livenessProbe:
             {{- toYaml . | nindent 12 }}

@@ -14,9 +14,11 @@ wired lint/install checks into CI.
 ### Question 1: What exactly does SOPS protect, and where does the plaintext still exist after a `helm install`?
 
 #### TL;DR
+
 SOPS protects the **file at rest in Git and on disk**. Once decrypted for Helm, the plaintext exists in several other places.
 
 #### Deep Dive
+
 1. **The encrypted file.** SOPS encrypts each value (here only under keys named `data`) with AES-256-GCM, using a data key that is itself encrypted
    to each age recipient. The `mac` protects the whole file from tampering. Structure stays readable, so diffs and reviews still work.
 2. **During the deploy.** `helm secrets` writes a temporary `.dec` file, runs Helm, then deletes it. That is why `*.dec` is git-ignored.
@@ -36,9 +38,11 @@ Also remember `lookup` (Lab 11) and GitOps: Argo CD renders with `helm template`
 ### Question 2: Why did the secret rotation need a `checksum/secret` annotation?
 
 #### TL;DR
+
 Pods read `envFrom` at start-up only. Changing a Secret does **not** restart Pods, so the annotation makes Helm change the Pod template, which triggers a rolling update.
 
 #### Deep Dive
+
 - Kubernetes populates environment variables from a Secret when the container starts. Updating the Secret later does not update running containers.
 - The same trick from Lab 6 applies: put a hash of the rendered `secret.yaml` in the Pod template annotations. New data means a new hash, which means a new ReplicaSet.
 - Mounted Secret **volumes** are refreshed by the kubelet eventually, but the application must re-read the files, so a checksum-driven restart is still common.
@@ -50,9 +54,11 @@ Pods read `envFrom` at start-up only. Changing a Secret does **not** restart Pod
 ### Question 3: What does `helm verify` prove that a version number does not, and what does it not prove?
 
 #### TL;DR
+
 It proves the archive is byte-for-byte what the holder of a **trusted key** signed. It says nothing about whether the chart is *safe*.
 
 #### Deep Dive
+
 | Claim | Version number | `helm verify` | `cosign verify` |
 | --- | --- | --- | --- |
 | Which release is this? | yes | yes | yes |
@@ -74,9 +80,11 @@ It proves the archive is byte-for-byte what the holder of a **trusted key** sign
 ### Question 4: Why is `tests/` in `.helmignore` written with a leading `/`?
 
 #### TL;DR
+
 Without the slash, the pattern matches a directory called `tests` at **any depth**, including `templates/tests/`, and your `helm test` hook silently disappears from the package.
 
 #### Deep Dive
+
 - `.helmignore` follows gitignore-like rules: a pattern with no slash matches names at every level; a leading `/` anchors it to the chart root.
 - The failure is silent. Helm applies `.helmignore` whenever it loads a chart, from a directory or an archive, so `helm lint` passes and `helm template` simply no longer contains the test Pod
   (`helm template d ./charts/nginx-demo | grep -c http-test` drops from 1 to 0). Nothing errors: the hook is just gone, and `helm test` finds nothing to run. A unit test or CI check that asserts the hook exists is the safety net.
@@ -96,6 +104,7 @@ Without the slash, the pattern matches a directory called `tests` at **any depth
 | Your own review | n/a | Intent and design | Anything mechanical |
 
 Notes from the lab:
+
 - Unit tests must be **deterministic**: assert on values you set (`release.name`, `set`), not on things like hashes of unrelated files. The checksum test only asserts the annotation's *shape*.
 - helm-unittest can only resolve templates listed in `templates:`, including ones another template `include`s (the checksum `include` of `secret.yaml`).
 - `ct install` runs **each `ci/*-values.yaml`**. The scenario files are how you make CI cover optional features (Secret, HPA, Ingress).
@@ -121,28 +130,36 @@ Lab 12 tests five security and automation failure modes:
 ### Scenario 1: Plain `helm` on an Encrypted Secrets File
 
 #### 1. What to Break
+
 Run standard `helm template` or `helm install` passing an encrypted values file directly without the `helm-secrets` plugin:
+
 ```bash
 helm template d ./charts/nginx-demo -f ./charts/nginx-demo/secrets.dev.yaml -s templates/secret.yaml | grep API_KEY
 ```
 
 #### 2. The Error Observed
+
 No error is raised! Instead, Helm renders:
+
 ```yaml
 API_KEY: ENC[AES256_GCM,data:...,iv:...,tag:...,type:str]
 ```
 
 #### 3. Why This Failed & Real-World Impact
+
 - Helm treats values files as plain YAML dictionaries. Because SOPS preserves valid YAML structure, Helm reads the ciphertext strings without error.
 - If deployed, Kubernetes creates a Secret containing the literal ciphertext `ENC[AES256_GCM,...]`.
 - Your application attempts to connect to databases or APIs using the ciphertext as the password, resulting in silent authentication failures that are hard to diagnose.
 - **Rule:** Always deploy encrypted values via `helm secrets install/upgrade` (or decrypt them in your CI pipeline prior to deployment).
 
 #### 4. How to Recover
+
 Use the `helm secrets` wrapper:
+
 ```bash
 helm secrets template d ./charts/nginx-demo -f ./charts/nginx-demo/secrets.dev.yaml -s templates/secret.yaml | grep API_KEY
 ```
+
 *Output:* `API_KEY: dev-api-key-12345`.
 
 ---
@@ -150,7 +167,9 @@ helm secrets template d ./charts/nginx-demo -f ./charts/nginx-demo/secrets.dev.y
 ### Scenario 2: Packaging Without Secrets Ignore Rules
 
 #### 1. What to Break
+
 Remove `/secrets.*.yaml` and `/.sops.yaml` from `charts/nginx-demo/.helmignore`:
+
 ```bash
 sed -i '/\/secrets\.\*\.yaml/d' charts/nginx-demo/.helmignore && sed -i '/\/\.sops\.yaml/d' charts/nginx-demo/.helmignore
 helm package ./charts/nginx-demo -d /tmp/pk-test
@@ -158,22 +177,28 @@ tar tzf /tmp/pk-test/nginx-demo-*.tgz | grep -E "secrets\.|\.sops"
 ```
 
 #### 2. The Error Observed
+
 ```text
 nginx-demo/.sops.yaml
 nginx-demo/secrets.dev.yaml
 ```
 
 #### 3. Why This Failed
+
 - By default, `helm package` bundles every file in the chart directory into the `.tgz` distribution archive unless excluded by `.helmignore`.
 - Even though the secret data is encrypted, publishing your `.sops.yaml` (which reveals recipient public keys and path rules) and environment secrets in public or shared chart repositories leaks internal metadata and exposes encrypted payloads to offline cryptanalysis.
 
 #### 4. How to Recover
+
 Restore the ignore rules in `.helmignore`:
+
 ```text
 /secrets.*.yaml
 /.sops.yaml
 ```
+
 Verify the packaged archive:
+
 ```bash
 helm package ./charts/nginx-demo -d /tmp/pk-check
 tar tzf /tmp/pk-check/nginx-demo-*.tgz | grep -E "secrets\.|\.sops"  # No output
@@ -184,31 +209,40 @@ tar tzf /tmp/pk-check/nginx-demo-*.tgz | grep -E "secrets\.|\.sops"  # No output
 ### Scenario 3: A Bare `tests/` Entry in `.helmignore`
 
 #### 1. What to Break
+
 Change the anchored pattern `/tests/` to an unanchored pattern `tests/` in `.helmignore`:
+
 ```bash
 sed -i 's/\/tests\//tests\//' charts/nginx-demo/.helmignore
 ```
 
 #### 2. The Error Observed
+
 Check `helm template`:
+
 ```bash
 helm template d ./charts/nginx-demo | grep -c http-test
 ```
+
 *Output:* `0` (was previously `1`).
 `helm lint` still reports success: `1 chart(s) linted, 0 chart(s) failed`.
 However, `helm unittest` immediately fails:
+
 ```text
 FAIL  helm test hook  charts/nginx-demo/tests/helm_test_hook_test.yaml
       template "nginx-demo/templates/tests/http.yaml" not exists or not selected in test suite
 ```
 
 #### 3. Why This Failed
+
 - In `.helmignore` and `.gitignore`, an unanchored directory pattern like `tests/` matches any directory named `tests` at any depth in the chart hierarchy, including `templates/tests/`.
 - Helm silently drops the `http.yaml` test hook pod during chart loading and packaging.
 - `helm lint` does not require a test pod, so linting passes. Only unit tests or inspecting the package manifest reveals that the test hook vanished.
 
 #### 4. How to Recover
+
 Anchor the pattern with a leading slash `/tests/` to match only the top-level unit-test directory:
+
 ```bash
 sed -i 's/^tests\//\/tests\//' charts/nginx-demo/.helmignore
 helm template d ./charts/nginx-demo | grep -c http-test  # Returns 1
@@ -219,13 +253,16 @@ helm template d ./charts/nginx-demo | grep -c http-test  # Returns 1
 ### Scenario 4: Catching Regressions with `helm-unittest`
 
 #### 1. What to Break
+
 Introduce an accidental naming regression in `_helpers.tpl` (e.g., renaming the deployment suffix from `"%s-deployment"` to `"%s-deploy"`):
+
 ```bash
 sed -i 's/"%s-deployment"/"%s-deploy"/' charts/nginx-demo/templates/_helpers.tpl
 helm unittest ./charts/nginx-demo
 ```
 
 #### 2. The Error Observed
+
 ```text
 FAIL  deployment  charts/nginx-demo/tests/deployment_test.yaml
       - names the Deployment and selector after the release
@@ -234,11 +271,14 @@ FAIL  deployment  charts/nginx-demo/tests/deployment_test.yaml
 ```
 
 #### 3. Why This Failed
+
 - `charts/nginx-demo/tests/deployment_test.yaml` contains an assertion verifying that `metadata.name` equals `shop-deployment`.
 - Helm unit tests run locally in milliseconds without spinning up pods or touching Kubernetes. They immediately detect naming drift before changes reach code review or cluster deployment.
 
 #### 4. How to Recover
+
 Revert the unintended change:
+
 ```bash
 sed -i 's/"%s-deploy"/"%s-deployment"/' charts/nginx-demo/templates/_helpers.tpl
 helm unittest ./charts/nginx-demo  # All 20 tests pass
@@ -249,12 +289,15 @@ helm unittest ./charts/nginx-demo  # All 20 tests pass
 ### Scenario 5: Decrypting With the Wrong Key
 
 #### 1. What to Break
+
 Simulate an attacker or unauthorized CI runner attempting to decrypt the secrets file without access to the age private key:
+
 ```bash
 XDG_CONFIG_HOME=$(mktemp -d) SOPS_AGE_KEY_FILE=/dev/null helm secrets decrypt charts/nginx-demo/secrets.dev.yaml
 ```
 
 #### 2. The Error Observed
+
 ```text
 Failed to get the data key required to decrypt the SOPS file.
 Group 0: FAILED
@@ -263,6 +306,7 @@ Group 0: FAILED
 ```
 
 #### 3. Why This Failed
+
 - SOPS requires an age private key matching the public key recipient specified in `.sops.yaml`.
 - Setting `XDG_CONFIG_HOME=$(mktemp -d)` isolates SOPS from local fallback keys in `~/.config/sops/age/keys.txt`, and `SOPS_AGE_KEY_FILE=/dev/null` provides no valid identities.
 - SOPS terminates with a non-zero exit code, ensuring that encrypted files cannot be decrypted without authorized credentials.
@@ -279,4 +323,3 @@ Group 0: FAILED
 | Unit Tests vs Linting | `helm lint` validates syntax and schemas; `helm unittest` validates exact rendered YAML document structure in milliseconds without a cluster. |
 | Provenance & Signing | `helm package --sign` generates `.prov` OpenPGP signatures over the archive hash; `cosign` signs the registry digest for OCI artifacts. |
 | Chart-Testing (`ct`) | Enforces SemVer increments, runs `yamllint` / `helm lint`, and spins up clean cluster releases for all `ci/*-values.yaml` scenarios. |
-

@@ -1,5 +1,7 @@
 # Extension review: Identity and secrets
 
+**Full re-run (third pass):** 2026-09-23 — every step re-executed end to end on a fresh kind cluster (Kubernetes v1.35.0), from an empty workspace, with k3d spot checks (Traefik Ingress, HPA). The items below were reproduced again unless marked otherwise.
+
 **Tested with:** Helm v3.19.0, kind (Kubernetes v1.35.0), 2026-09-22
 **Result:** Everything works:
 

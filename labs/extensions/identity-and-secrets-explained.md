@@ -46,7 +46,7 @@ A **namespaced Role** is always appropriate when an application only needs to in
 
 2. **Multi-Tenancy:**
    - In shared or multi-tenant clusters, application developers are typically not cluster administrators.
-   - Standard Kubernetes users have permissions to create namespaced Roles in their project namespace, but lack cluster-wide permissions to create `ClusterRoles` or `ClusterRoleBindings`.
+   - Standard Kubernetes users have permissions to create namespaced Roles in their project namespace (granting permissions they already hold due to RBAC escalation prevention), but lack cluster-wide permissions to create `ClusterRoles` or `ClusterRoleBindings`.
 
 3. **When ClusterRoles ARE Necessary:**
    - Ingress controllers (must watch Services and Ingresses across all namespaces).
@@ -67,7 +67,9 @@ A **namespaced Role** is always appropriate when an application only needs to in
 Run `helm upgrade` pointing the `existingSecret` parameter to a secret that does not exist in the cluster:
 
 ```bash
-helm upgrade demo-dev ./charts/nginx-demo -n helm-lab --set existingSecret=nonexistent-secret --wait=false
+helm upgrade demo-dev ./charts/nginx-demo -n helm-lab \
+  --reset-values -f ./charts/nginx-demo/values-dev.yaml \
+  --set existingSecret=nonexistent-secret --wait=false
 ```
 
 #### 2. The Error Observed
@@ -108,10 +110,12 @@ Warning  Failed     10s (x3 over 35s)   kubelet  Error: secret "nonexistent-secr
 
 #### 4. How to Recover
 
-Restore the valid secret name (`demo-secret`):
+Restore the valid secret name (`demo-learning`):
 
 ```bash
-helm upgrade demo-dev ./charts/nginx-demo -n helm-lab --set existingSecret=demo-secret --wait --timeout 120s
+helm upgrade demo-dev ./charts/nginx-demo -n helm-lab \
+  --reset-values -f ./charts/nginx-demo/values-dev.yaml \
+  --set existingSecret=demo-learning --wait --timeout 120s
 ```
 
 Verify that the new Pod starts and mounts the Secret successfully:
@@ -127,7 +131,7 @@ kubectl exec -n helm-lab deployment/demo-dev-deployment -- printenv LAB_TOKEN
 NAME                                   READY   STATUS    RESTARTS   AGE
 demo-dev-deployment-85df649f88-k8d12   1/1     Running   0          10s
 
-super-secret-token-value
+fake-training-value
 ```
 
 ---

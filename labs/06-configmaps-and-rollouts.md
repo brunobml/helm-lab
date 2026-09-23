@@ -376,6 +376,9 @@ Read the Events section near the bottom for the failing resource or operation.
 
 </details>
 
+> [!TIP]
+> See [06-configmaps-and-rollouts-explained.md](06-configmaps-and-rollouts-explained.md) for in-depth architectural breakdowns of checksum mechanics, kubelet volume sync periods, and YAML indentation rules.
+
 ## Finish
 
 - [ ] Your custom HTML is visible through the Service.

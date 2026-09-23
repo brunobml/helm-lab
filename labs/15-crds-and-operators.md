@@ -28,7 +28,7 @@ Let's observe this behavior hands-on using the educational `charts/crd-demo` cha
 If you are practicing on a branch from `lab-14-complete`, check out the `charts/crd-demo` starter:
 
 ```bash
-git checkout lab-15-complete -- charts/crd-demo
+git checkout main -- charts/crd-demo
 ```
 
 Inspect `charts/crd-demo`:

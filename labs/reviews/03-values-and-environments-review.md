@@ -1,5 +1,7 @@
 # Lab 3 review: Values and environments
 
+**Full re-run (third pass):** 2026-09-23 — every step re-executed end to end on a fresh kind cluster (Kubernetes v1.35.0), from an empty workspace, with k3d spot checks (Traefik Ingress, HPA). The items below were reproduced again unless marked otherwise.
+
 **Tested with:** Helm v3.19.0, kind (Kubernetes v1.35.0), 2026-09-22
 **Result:** Every command works and every expected value matches: renders show replicas 1 / 3 / 4, the two Deployments show 1/1 and 3/3, and each Service selects its own release. My files match `lab-03-complete` exactly. The explained page has three factual errors.
 

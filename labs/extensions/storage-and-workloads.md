@@ -26,15 +26,50 @@ helm install storage-demo ./charts/storage-demo -n helm-lab --wait --timeout 120
 kubectl get pvc,pods -n helm-lab
 ```
 
-Expect a Bound PVC and the same marker after Pod replacement. Record exactly
-which object owns the claim and what happens to it on uninstall. For the Job,
-inspect completion and logs; for a CronJob, observe a scheduled Job.
+Test volume persistence across Pod replacement:
+
+```bash
+# Write a marker file to the mounted volume:
+kubectl exec -n helm-lab deploy/storage-demo -- sh -c 'echo marker-1 > /data/marker'
+
+# Delete the running Pod:
+kubectl delete pod -n helm-lab -l app=storage-demo --wait
+kubectl rollout status deploy/storage-demo -n helm-lab
+
+# Read the marker from the newly scheduled Pod:
+kubectl exec -n helm-lab deploy/storage-demo -- cat /data/marker
+```
+
+*Expect:* `marker-1`. The file survived Pod recreation!
 
 ## Break it and recover
 
-Request a nonexistent storage class, inspect the Pending PVC events, then
-restore the class. Some PVC fields cannot be changed in place: for disposable
-exercise data, uninstall and recreate the claim after understanding data loss.
+1. Attempt to change `storageClass` on the existing release:
+
+   ```bash
+   helm upgrade storage-demo ./charts/storage-demo -n helm-lab --set persistence.storageClass=nonexistent
+   ```
+
+   *Expect Error:* `PersistentVolumeClaim ... spec is immutable after creation`. PVC specs are immutable once bound.
+
+2. To see the `Pending` state, uninstall and test on a fresh install:
+
+   ```bash
+   helm uninstall storage-demo -n helm-lab
+   kubectl wait --for=delete pvc/storage-demo-data -n helm-lab --timeout=30s
+   helm install storage-demo ./charts/storage-demo -n helm-lab --set persistence.storageClass=nonexistent
+   kubectl describe pvc storage-demo-data -n helm-lab
+   ```
+
+   *Expect:* Status `Pending` with event `ProvisioningFailed ... storageclass.storage.k8s.io "nonexistent" not found`.
+
+3. Recover:
+
+   ```bash
+   helm uninstall storage-demo -n helm-lab
+   kubectl wait --for=delete pvc/storage-demo-data -n helm-lab --timeout=30s
+   helm install storage-demo ./charts/storage-demo -n helm-lab
+   ```
 
 ## Explain
 
@@ -50,6 +85,37 @@ Uninstall `storage-demo`, inspect remaining PVCs/PVs, and remove only disposable
 exercise storage. Save `extension-storage-complete`.
 
 <details>
+<summary>Hint: charts/storage-demo/values.yaml and Chart.yaml</summary>
+
+```yaml
+# Chart.yaml
+apiVersion: v2
+name: storage-demo
+description: A Helm chart demonstrating persistent storage and workloads
+version: 0.1.0
+appVersion: "1.36"
+```
+
+```yaml
+# values.yaml
+replicaCount: 1
+
+image:
+  repository: busybox
+  tag: "1.36"
+  pullPolicy: IfNotPresent
+
+persistence:
+  enabled: true
+  accessMode: ReadWriteOnce
+  size: 100Mi
+  mountPath: /data
+  storageClass: ""  # Set to "-" for explicit empty string: storageClassName: ""
+```
+
+</details>
+
+<details>
 <summary>Hint: charts/storage-demo/templates/pvc.yaml</summary>
 
 ```yaml
@@ -61,8 +127,12 @@ metadata:
 spec:
   accessModes:
     - {{ .Values.persistence.accessMode }}
-  {{- if .Values.persistence.storageClassName }}
-  storageClassName: {{ .Values.persistence.storageClassName | quote }}
+  {{- if .Values.persistence.storageClass }}
+  {{- if (eq "-" .Values.persistence.storageClass) }}
+  storageClassName: ""
+  {{- else }}
+  storageClassName: {{ .Values.persistence.storageClass | quote }}
+  {{- end }}
   {{- end }}
   resources:
     requests:

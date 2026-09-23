@@ -1,63 +1,49 @@
 # Lab 0 review: Chart creation
 
-**Tested with:** Helm v3.19.0, kind v1.35.0 (no cluster needed for this lab), 2026-09-22
-**Result:** All steps work. The "Break it and recover" step does **not** produce the documented error.
+**Full re-run (third pass):** 2026-09-23 — every step re-executed end to end on a fresh kind cluster (Kubernetes v1.35.0), from an empty workspace, with k3d spot checks (Traefik Ingress, HPA). The items below were reproduced again unless marked otherwise.
 
-## Bugs
+**Re-validated:** 2026-09-23 against `44d3404` (Helm v3.19.0).
 
-### B1: "Break it" produces a different error than documented (high)
+**Fixed and verified:** the break-it now uses `version: latest` (it fails as documented), the note on `1`/`"1"` is accurate, `httproute.yaml` is listed, and the `[INFO] icon` note is present.
 
-The lab and the explained page say `version: 1` produces:
+## Still open
+
+### B2: `helm create` on `main` silently overwrites the finished chart (medium)
+
+The **Start** line is unchanged ("An empty workspace, a practice branch, or a new worktree"), and `README.md` still says "The working chart starts with a Deployment and Service". A learner on `main` runs `helm create charts/nginx-demo` over the finished 0.6.0 chart and gets `WARNING: ... already exists. Overwriting.`, and stale `ci/`, `tests/`, `values.schema.json`, and `Chart.lock` survive Step 3's `rm -rf templates/*`.
+**Fix:** Give a concrete start, for example `git switch -c my-lab-00 lab-00-start && git rm -rq charts/nginx-demo && rm -rf charts/nginx-demo`, and fix the README sentence.
+
+### New N2: `helm create charts/nginx-demo` fails in an empty workspace (high)
+
+Found in the full re-run, starting from a truly empty workspace as the **Start** line says:
 
 ```text
-[ERROR] Chart.yaml: version "1" is not a valid SemVer
+Error: stat .../charts: no such file or directory
 ```
 
-What actually happens with Helm 3.19.0:
+`helm create` doesn't create missing parent directories. The first pass missed this because `charts/` already existed. **Fix:** Add `mkdir -p charts` before Step 1's `helm create` (verified to fix it).
 
-| Value in `Chart.yaml` | Actual `helm lint` result |
-| --- | --- |
-| `version: 1` (unquoted) | `[ERROR] Chart.yaml: version should be of type string but it's of type float64` |
-| `version: "1"` (quoted) | **Passes.** Masterminds semver coerces `1` to `1.0.0` |
-| `version: "1.0"`, `version: v0.1` | **Passes** (coerced) |
-| `version: latest` | `[ERROR] Chart.yaml: version 'latest' is not a valid SemVer` (plus `unable to load chart`) |
-| `version: 1.0.0.1` | `[ERROR] Chart.yaml: version '1.0.0.1' is not a valid SemVer` |
+### New N1: The expected lint output is abridged (low)
 
-So the explanation in `00-chart-creation-explained.md` ("A single integer `1` lacks the minor and patch segments... triggering an immediate linter failure") is factually wrong. Helm accepts partial versions, and the unquoted failure is a YAML type problem, not a SemVer problem.
+The new expected block shows 3 lines. Helm 3.19 prints 6:
 
-**Fix:** Use `version: latest` for the break step and update the expected output. Optionally keep `version: 1` as a second exercise about YAML typing, which pairs well with the `appVersion` quoting lesson.
-Also correct the Golden Rule table ("Must follow SemVer (`x.y.z`)"): Helm requires *parseable* SemVer, and coerces `1` and `1.0`.
-
-### B2: `helm create` silently overwrites an existing chart (medium)
-
-`README.md` says "The working chart starts with a Deployment and Service", but `main` contains the **finished** chart (0.6.0, with subcharts, schema, and tests).
-A learner on `main` who runs Step 1 (`helm create charts/nginx-demo`) gets `WARNING: File ... already exists. Overwriting.`. The result mixes generated files with the old ones (`configmap.yaml`, `migration-job.yaml`, and so on). Step 3's `rm -rf templates/*` hides part of this, but the stale `ci/`, `tests/`, `values.schema.json`, `Chart.lock`, and `charts/*.tgz` remain. The next `helm lint` then fails or behaves strangely.
-
-**Fix:** Make the **Start** line concrete, for example:
-
-```bash
-git switch --orphan my-lab-00   # or: git worktree add ../helm-lab-practice lab-00-start
-# or on a practice branch from main:
-git rm -r --quiet charts/nginx-demo && rm -rf charts/nginx-demo
+```text
+[ERROR] Chart.yaml: version 'latest' is not a valid SemVer
+[INFO] Chart.yaml: icon is recommended
+[ERROR] templates/: validation: chart.metadata.version "latest" is invalid
+[ERROR] : unable to load chart
+ validation: chart.metadata.version "latest" is invalid
+Error: 1 chart(s) linted, 1 chart(s) failed
 ```
 
-Also fix the README sentence "The working chart starts with a Deployment and Service". It is true only at the `lab-00-start` tag.
+Say "among other lines, you will see...", or paste the full output.
 
-## Accuracy issues
+### Explained page (unchanged, still wrong)
 
-- **I1:** The Step 2 file list omits `templates/httproute.yaml`. Helm ≥ 3.17 generates it (Gateway API HTTPRoute). Add it to the list.
-- **I2:** `helm lint` on the finished Lab 0 chart prints `[INFO] Chart.yaml: icon is recommended`. The Verify section only shows `1 chart(s) linted, 0 chart(s) failed`, so mention the INFO line so learners don't think something is wrong.
-- **I3:** The `lab-00-start` tag differs from what the lab tells you to write:
-  - The tag's `Chart.yaml` keeps all the `helm create` comments, while the lab says "Replace ... with clean, minimal metadata".
-  - The tag's `values.yaml` and `deployment.yaml` contain explanatory comments the lab does not (`# Explicit application version...`, `# targetPort must match NGINX's listening port...`). These comments are helpful, so consider adding them to the lab snippets.
-  - The tag contains `charts/nginx-demo/README.md`, which the lab never asks you to create.
+`00-chart-creation-explained.md` still teaches `version: 1` → `version "1" is not a valid SemVer`, and still says "A single integer `1` lacks the minor and patch segments... triggering an immediate linter failure". It now contradicts the lab. Update it to `latest`. The Golden Rule "Must follow SemVer (`x.y.z`)" should also mention that Helm coerces `1` and `1.0`.
 
-  Result: `git diff lab-00-start` (Approach 1 in the README) shows noise even for a learner who followed the lab exactly.
-- **I4:** The Step 3 note says "Keep `.helmignore` and the `charts/` folder intact", but git doesn't track empty directories, so `charts/` disappears after the commit/checkout round trip. That's harmless, but worth a one-line note.
+### Minor (unchanged)
 
-## Ease-of-following suggestions
-
-- **S1:** In Step 3, show the expected state after deletion (`ls -A charts/nginx-demo/templates` prints nothing) so learners can confirm it.
-- **S2:** Explain that `helm create` generates `nginx` as the default image with `appVersion` as the tag. That motivates why the lab replaces `values.yaml`.
-- **S3:** The Verify section could add `helm template demo-dev ./charts/nginx-demo | grep -E '^kind|name:'` for a quick visual check instead of reading the whole output.
-- **S4:** In the Explain section, the answer to Question 2 says `.helmignore` applies when "rendering templates". It actually applies when Helm *loads* a chart directory (install, template, lint, and package all use the loader), so the wording is roughly right but could be clearer.
+- **I3:** The `lab-00-start` tag keeps the `helm create` comments in `Chart.yaml`, has extra comments in `values.yaml`/`deployment.yaml`, and has a `README.md` the lab never creates, so `git diff lab-00-start` is noisy.
+- **I4:** Mention that the empty `charts/` directory isn't tracked by git.
+- **S1–S4:** Show `ls -A templates` output after deletion, explain why `values.yaml` is replaced, use a compact Verify (`grep -E '^kind|name:'`), and clarify that `.helmignore` applies whenever the chart is loaded.

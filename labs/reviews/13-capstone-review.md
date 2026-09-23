@@ -1,5 +1,8 @@
 # Lab 13 review: Capstone, a three-tier release
 
+**Full re-run (third pass):** 2026-09-23 — every step re-executed end to end on a fresh kind cluster (Kubernetes v1.35.0), from an empty workspace, with k3d spot checks (Traefik Ingress, HPA). The items below were reproduced again unless marked otherwise.
+**I4 is now resolved in the chart** (see below).
+
 **Tested with:** Helm v3.19.0, sops 3.13.3, helm-secrets 4.8.0-dev, helm-unittest 1.1.2, ct v3.14.0, gpg 2.4.4, `postgres:16-alpine`, `postgrest/postgrest:v12.2.3`, kind (Kubernetes v1.35.0), 2026-09-22
 **Result:** This is the best lab in the series. Every file in the lab text is byte-identical to `lab-13-complete`, and **every** expected output reproduced:
 
@@ -18,9 +21,10 @@ The cleanup commands left nothing behind.
 ## Issues
 
 - **I1: Hidden dependency on the optional extensions.** Step 9 expects "**1 ServiceAccount**" among the rendered kinds. That object comes from the *Identity extension* (`serviceAccount.create: true`). A learner who skipped the "optional" extensions sees no ServiceAccount and a different count. The same goes for Lab 10+ generally: `lab-10-complete` already contains all extension files. Either make the extensions officially part of the core path (between Lab 9 and 10, as the tags imply), or word the expectation as "... 1 ServiceAccount (if you did the Identity extension)".
+- **Note:** `main` now pins `nginx-demo` as `">=0.5.0 <=0.6.0"`, and a fresh clone builds `shop` (verified). The lab text still shows `version: 0.5.0`, which is correct at Lab 13 time.
 - **I2: Stale "Roadmap" references.** The lab's Explain section and explained Q6 say "compare with the Roadmap's Lab 16", but Lab 16 now exists. Link to `16-production-hardening-and-best-practices.md` instead.
-- **I3: Duplicated output from `kubectl run --rm -i -q`.** The "Follow the data" command printed the JSON twice (`[{...}][{...}]`) on kubectl 1.35: once from the attach stream and once from the logs fallback. It's harmless, but learners may think two requests were made. `kubectl run ... --attach --rm` or `kubectl exec` into an existing Pod avoids it.
-- **I4:** Explained Q1.5 lists places where the `app: <release>` assumption can hide, but misses the most relevant one: **`nginx-demo`'s own Lab 10 migration Job**, whose Pod template carries `app: <release>` and does become a web Service endpoint while it runs (see the Lab 10 review B1). The capstone avoids it only because `web.migration.enabled: false`. Worth naming explicitly, since it's the same bug inside the chart the learner wrote.
+- **I3: Duplicated output from `kubectl run --rm -i -q`.** The "Follow the data" command printed the JSON twice (`[{...}][{...}]`) on kubectl 1.35: once from the attach stream and once from the logs fallback (confirmed in the re-run: kubectl prints `warning: couldn't attach to pod/curl, falling back to streaming logs`). It's harmless, but learners may think two requests were made. `kubectl run ... --attach --rm` or `kubectl exec` into an existing Pod avoids it.
+- **I4 (chart resolved, doc still open):** `main`'s migration Job now uses `nginx-demo.hookLabels`, so even with `web.migration.enabled=true` the Pod carries no `app:` label (verified). Explained Q1.5 lists places where the `app: <release>` assumption can hide, but misses the most relevant one: **`nginx-demo`'s own Lab 10 migration Job**, whose Pod template carries `app: <release>` and does become a web Service endpoint while it runs (see the Lab 10 review B1). The capstone avoids it only because `web.migration.enabled: false`. Worth naming explicitly, since it's the same bug inside the chart the learner wrote.
 - **I5:** Many steps write to fixed `/tmp/...` paths (`/tmp/shop.yaml`, `/tmp/shop-pkg`, `/tmp/shop-pull`). Use one `LAB_TMP=$(mktemp -d)` for the lab (same suggestion as Lab 12).
 
 ## Ease-of-following suggestions

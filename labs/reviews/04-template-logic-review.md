@@ -1,5 +1,7 @@
 # Lab 4 review: Template logic
 
+**Full re-run (third pass):** 2026-09-23 — every step re-executed end to end on a fresh kind cluster (Kubernetes v1.35.0), from an empty workspace, with k3d spot checks (Traefik Ingress, HPA). The items below were reproduced again unless marked otherwise.
+
 **Tested with:** Helm v3.19.0, kind (Kubernetes v1.35.0), 2026-09-22
 **Result:** Steps and Verify work exactly as written: the default render has no `env` or `resources`, the dev render has both, and `printenv` prints `dev` / `false`. My template matches `lab-04-complete`. Several error messages on the explained page don't match reality, and one example contradicts its own point.
 

@@ -8,8 +8,6 @@ composition from database setup and image downloads.
 
 ## Steps
 
-## Steps
-
 ### Step 1: Create the subchart metadata and values
 
 Create the directory `charts/lab-banner/` and add its metadata file `charts/lab-banner/Chart.yaml`:
@@ -27,6 +25,7 @@ Next, create `charts/lab-banner/values.yaml` with the subchart's default values:
 message: Hello from the child chart
 global: {}
 ```
+
 > [!NOTE]
 > Defining `global: {}` in the child chart's defaults ensures the subchart can be rendered or linted independently without failing on undefined `.Values.global` references.
 
@@ -47,6 +46,7 @@ data:
 ```
 
 **Notice value resolution:**
+
 - `.Values.message`: Reads from local subchart values (or parent overrides under the `lab-banner:` key).
 - `.Values.global.environment`: Reads from the top-level `global:` key shared across all charts.
 
@@ -98,20 +98,25 @@ global:
 ## Verify
 
 1. **Update and package dependencies:**
+
    ```bash
    helm dependency update ./charts/nginx-demo
    helm dependency list ./charts/nginx-demo
    ```
+
    *Expect:* Helm generates `charts/nginx-demo/Chart.lock` and packages `charts/nginx-demo/charts/lab-banner-0.1.0.tgz`. The list shows `lab-banner 0.1.0 ok`.
 
 2. **Lint both charts:**
+
    ```bash
    helm lint ./charts/lab-banner
    helm lint ./charts/nginx-demo
    ```
+
    *Expect:* Both charts pass with 0 errors.
 
 3. **Verify template rendering (enabled vs disabled):**
+
    ```bash
    # Should include demo-dev-banner ConfigMap with environment="dev" and message="Hello from the parent"
    helm template demo-dev ./charts/nginx-demo -f ./charts/nginx-demo/values-dev.yaml
@@ -121,11 +126,13 @@ global:
    ```
 
 4. **Deploy and inspect cluster state:**
+
    ```bash
    helm upgrade demo-dev ./charts/nginx-demo -n helm-lab --reset-values -f ./charts/nginx-demo/values-dev.yaml --wait --timeout 120s
    kubectl get configmap demo-dev-banner -n helm-lab -o yaml
    helm test demo-dev -n helm-lab --timeout 60s
    ```
+
    *Expect:* `demo-dev-banner` exists in `helm-lab` namespace with `data.environment: "dev"`. Running `helm list` shows only a single release (`demo-dev`), proving the subchart is managed within the parent release.
 
 ## Break it and recover

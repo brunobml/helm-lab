@@ -51,7 +51,7 @@ HPA calculates CPU utilization as a percentage of the container's **requested CP
 2. **What Happens if `requests.cpu` is Missing:**
    - If no CPU request is specified, the denominator is undefined.
    - HPA reports `TARGETS: <unknown>/80%`.
-   - The HPA controller logs an error indicating that metrics could not be computed and refuses to scale the Deployment.
+   - The HPA condition shows `FailedGetResourceMetric: missing request for cpu` (`kubectl describe hpa`) and refuses to scale the Deployment.
 
 3. **Why Helm Must Conditionally Omit `replicas`:**
    - In `templates/deployment.yaml`:
@@ -77,7 +77,9 @@ HPA calculates CPU utilization as a percentage of the container's **requested CP
 Run `helm upgrade` setting the readiness probe to a nonexistent path like `/missing.html`:
 
 ```bash
-helm upgrade demo-dev ./charts/nginx-demo -n helm-lab --set readinessProbe.httpGet.path=/missing.html --wait=false
+helm upgrade demo-dev ./charts/nginx-demo -n helm-lab \
+  --reset-values -f ./charts/nginx-demo/values-dev.yaml \
+  --set readinessProbe.httpGet.path=/missing.html --wait=false
 ```
 
 *(We pass `--wait=false` because otherwise Helm will wait and time out waiting for the unready Pod).*
@@ -95,29 +97,23 @@ kubectl get pods -n helm-lab -l app=demo-dev
 ```text
 NAME                                   READY   STATUS    RESTARTS   AGE
 demo-dev-deployment-64fc987bf5-h29sk   0/1     Running   0          30s
+demo-dev-deployment-58d7b48cb9-x92lk   1/1     Running   0          10m
 ```
 
 Notice:
 
-- `STATUS` is **Running** (the container started and the process is alive).
-- `READY` is **0/1** (the readiness probe is failing HTTP 404).
+- The new Pod's `STATUS` is **Running** but `READY` is **0/1** (the readiness probe is failing HTTP 404).
+- The previous Pod remains **1/1 Running**!
 
 #### 3. Inspect Service Endpoints
 
-Check whether the Service has endpoints available to route traffic:
+Check the EndpointSlice:
 
 ```bash
 kubectl get endpointslices -n helm-lab -l kubernetes.io/service-name=demo-dev-service
 ```
 
-*Output:*
-
-```text
-NAME                     ADDRESSTYPE   PORTS   ENDPOINTS   AGE
-demo-dev-service-abc12   IPv4          80                  2m
-```
-
-Notice that `ENDPOINTS` is completely empty! Because the Pod failed readiness, Kubernetes removed its IP address from the Service to protect users from receiving errors.
+Notice that the EndpointSlice gates traffic: the new unready Pod is marked `ready: false` (or not added to endpoints), while the old Pod remains `ready: true` and continues serving user requests. Kubernetes rolling updates prevent an unready Pod from terminating healthy existing Pods! (If you were to delete the old Pod or use `strategy: { type: Recreate }`, endpoints would become completely empty).
 
 #### 4. How to Recover
 

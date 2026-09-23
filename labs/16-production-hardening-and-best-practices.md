@@ -204,7 +204,7 @@ podDisruptionBudget:
 
 ### Step 6: Add topology spread constraints and default resources
 
-In `charts/nginx-demo/templates/deployment.yaml`, allow distributing Pods across nodes or availability zones:
+In `charts/nginx-demo/templates/deployment.yaml`, allow distributing Pods across nodes or availability zones. Place this block inside `spec.template.spec`, alongside `securityContext`:
 
 ```yaml
       {{- with .Values.topologySpreadConstraints }}
@@ -282,6 +282,21 @@ networkPolicy:
 
 Documenting chart values manually leads to stale documentation. [helm-docs](https://github.com/norwoodj/helm-docs) parses docstrings prefixed with `# --` in `values.yaml` and auto-generates Markdown tables.
 
+Add `# --` docstring comments above the parameters in `charts/nginx-demo/values.yaml` (or verify them if working from the repository):
+
+```yaml
+# -- Number of replicas to deploy
+replicaCount: 1
+
+image:
+  # -- Container image repository
+  repository: nginxinc/nginx-unprivileged
+  # -- Image pull policy
+  pullPolicy: IfNotPresent
+  # -- Overrides the image tag whose default is the chart appVersion
+  tag: ""
+```
+
 Run `helm-docs` using Docker (passing `--user` so generated files are owned by your current user):
 
 ```bash
@@ -300,7 +315,7 @@ Notice that all parameters, types, and defaults are cataloged. Parameters docume
 
 ## Part E: CI Policy and schema scanning with `kubeconform`
 
-Before deploying manifests to a cluster, validate rendered templates against official Kubernetes OpenAPI schemas using `kubeconform`:
+Before deploying manifests to a cluster, validate rendered templates against official Kubernetes OpenAPI schemas using `kubeconform` (specifying a `-kubernetes-version` that matches your cluster minor, e.g. 1.30.0 or 1.32.0):
 
 ```bash
 helm template test-release charts/nginx-demo \
@@ -415,12 +430,20 @@ version: 0.6.0
 > **Managing Downstream Dependencies:**
 > When you bump a chart's version (`0.5.0` $\to$ `0.6.0`), any umbrella charts or downstream consumers that pin it (such as `charts/shop`) must update their dependency version constraint in `Chart.yaml` (`version: ">=0.5.0 <=0.6.0"`) and rebuild their locks (`helm dependency update charts/shop`).
 
-Run unit tests (including the hardening test suite in `tests/hardening_test.yaml`):
+Ensure the hardening test suite `charts/nginx-demo/tests/hardening_test.yaml` is in place (check it out from `main` or verify its contents):
+
+```bash
+git checkout main -- charts/nginx-demo/tests/hardening_test.yaml
+```
+
+Run the complete unit test suite:
 
 ```bash
 helm unittest charts/nginx-demo
 git status
 ```
+
+*Expect:* All 28 tests in `charts/nginx-demo` pass (`PASS  charts/nginx-demo  ... Tests: 28 passed, 28 total`). Running `helm unittest charts/nginx-demo charts/shop` passes 42/42 tests!
 
 ---
 

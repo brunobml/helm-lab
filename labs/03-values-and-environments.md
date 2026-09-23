@@ -16,7 +16,7 @@ helm template demo-prod ./charts/nginx-demo -f ./charts/nginx-demo/values-prod.y
 helm template precedence ./charts/nginx-demo -f ./charts/nginx-demo/values-dev.yaml -f ./charts/nginx-demo/values-prod.yaml --set replicaCount=4
 ```
 
-4. Install both release configurations:
+1. Install both release configurations:
 
 ```bash
 helm upgrade demo-dev ./charts/nginx-demo -n helm-lab --reset-values -f ./charts/nginx-demo/values-dev.yaml --wait --timeout 120s

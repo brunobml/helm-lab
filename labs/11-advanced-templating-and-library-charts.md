@@ -85,7 +85,8 @@ Two things to take from this:
   and drop `default` from the template.
 - **`tpl` renders a string as a template.** Values are plain data, so `{{ ... }}` in `values.yaml`
   stays literal (`plain`) until a template calls `tpl` on it (`templated`). `tpl` needs a context;
-  pass `.` (or `$` inside a `range`).
+  pass `.` (or `$` inside a `range`). Only evaluate `tpl` on trusted input: never pass untrusted
+  end-user inputs to `tpl`, as template execution can invoke `lookup` to read cluster Secrets.
 
 ### Step 3: `lookup` keeps a generated value stable
 
@@ -128,7 +129,7 @@ kubectl get secret p-token -n helm-lab -o jsonpath='{.data.token}'; echo
 *Expect:* the two `helm template` tokens differ; the two `kubectl` tokens are identical.
 
 > [!WARNING]
-> `lookup` returns nothing under plain `helm template` and `--dry-run=client`. GitOps tools that
+> `lookup` returns nothing under plain `helm template` and `--dry-run=client`. (Note: `helm template --dry-run=server` or `helm install/upgrade --dry-run=server` *does* query the cluster). GitOps tools that
 > render with `helm template` (Argo CD, Flux's default) never see cluster state, so the token
 > would be regenerated on every sync. For secrets under GitOps, use an external secret manager
 > (see the Identity extension) instead.
@@ -373,25 +374,36 @@ Do each in a scratch values file (for example `/tmp/bad.yaml`) passed with `-f`;
 `values-dev.yaml`.
 
 1. **A `tpl` expression on a missing key.**
+
    ```yaml
    extraConfigMaps:
      settings:
        OWNER: "{{ .Values.team.name }}"
    ```
+
    *Expect:* `error calling tpl ... nil pointer evaluating interface {}.name`. This is **not** a
    `required` failure. `team` does not exist, so `.name` on it crashes. Fix it by defining `team`
    in `values.yaml`, or guard the access: `{{ .Values.team | default dict | dig "name" "unassigned" }}`.
+
 2. **An empty ConfigMap.** The schema stops it first:
+
    ```bash
    helm template d ./charts/nginx-demo --set-json 'extraConfigMaps={"empty":{}}'
    ```
+
    *Expect:* `minProperties: got 0, want 1`. Now bypass the schema and reach the library's own guard:
+
    ```bash
    helm template d ./charts/nginx-demo --set-json 'extraConfigMaps={"empty":{}}' --skip-schema-validation
    ```
+
    *Expect:* `lab-common.configmap: "empty" needs at least one key under 'data'`. Try changing the
-   library's `fail` check to `required` and see what renders (an invalid ConfigMap with an empty `data:`,
-   because `required` only rejects `nil` and `""`). Restore it.
+   library's `fail` check to `required` in `charts/lab-common/templates/_configmap.tpl`. Because parent
+   charts render from the packaged `.tgz` archive, rebuild dependencies first:
+   `helm dependency update ./charts/nginx-demo --skip-refresh`. Then re-run the `--skip-schema-validation`
+   command above to see what renders (an invalid ConfigMap with an empty `data:`, because `required`
+   only rejects `nil` and `""`). Then restore `fail` in `_configmap.tpl` and run
+   `helm dependency update ./charts/nginx-demo --skip-refresh` again.
 3. **A wrong type.** `--set extraConfigMaps.settings=1` fails schema validation
    (`got number, want object`).
 

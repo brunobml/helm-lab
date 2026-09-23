@@ -22,17 +22,55 @@ Do not commit real secrets. Base64 in a Kubernetes Secret is encoding, not encry
 
 ## Verify
 
-Render all create/false combinations and inspect the ServiceAccount reference.
-Deploy the fake Secret reference, then use `kubectl exec` and `printenv LAB_TOKEN`
-to verify injection. If your cluster identity permits impersonation, run
+Render all create/false combinations and inspect the ServiceAccount reference:
+
+```bash
+for c in true false; do for n in "" custom; do
+  echo "create=$c name=$n"
+  helm template demo-dev ./charts/nginx-demo --set serviceAccount.create=$c --set serviceAccount.name=$n \
+    | grep -E 'kind: ServiceAccount|serviceAccountName'
+done; done
+```
+
+Deploy the fake Secret reference with dev values:
+
+```bash
+helm upgrade demo-dev ./charts/nginx-demo -n helm-lab \
+  --reset-values -f ./charts/nginx-demo/values-dev.yaml \
+  --set serviceAccount.create=true \
+  --set rbac.create=true \
+  --set existingSecret=demo-learning \
+  --wait
+```
+
+Verify injection with `kubectl exec`:
+
+```bash
+kubectl exec -n helm-lab deploy/demo-dev-deployment -- printenv LAB_TOKEN
+```
+
+If your cluster identity permits impersonation, run
 `kubectl auth can-i get configmap/demo-dev-page` with
 `--as=system:serviceaccount:helm-lab:<your-service-account>` and `-n helm-lab`;
 expect yes only with the exercise's binding. Test a different ConfigMap; expect no.
 
 ## Break it and recover
 
-Reference a nonexistent Secret, observe the Pod configuration error with
-`kubectl describe pod`, then restore the existing Secret name and upgrade.
+Reference a nonexistent Secret while preserving dev values:
+
+```bash
+helm upgrade demo-dev ./charts/nginx-demo -n helm-lab \
+  --reset-values -f ./charts/nginx-demo/values-dev.yaml \
+  --set existingSecret=nonexistent-secret --wait=false
+```
+
+Observe the Pod configuration error with `kubectl describe pod` (the existing Pod continues serving while the new Pod fails with `CreateContainerConfigError`). Then restore `demo-learning` and upgrade:
+
+```bash
+helm upgrade demo-dev ./charts/nginx-demo -n helm-lab \
+  --reset-values -f ./charts/nginx-demo/values-dev.yaml \
+  --set existingSecret=demo-learning --wait
+```
 
 ## Explain
 
@@ -44,8 +82,43 @@ namespaced Role be more appropriate than a ClusterRole?
 
 ## Cleanup and checkpoint
 
-Remove the Secret reference via upgrade before deleting `demo-learning`. Disable
+Remove the Secret reference via upgrade before deleting `demo-learning` (otherwise any subsequent Pod restart will enter `CreateContainerConfigError`). Disable
 the exercise's RBAC if no longer needed. Save `extension-identity-complete`.
+
+<details>
+<summary>Hint: templates/deployment.yaml edits</summary>
+
+```yaml
+    spec:
+      serviceAccountName: {{ include "nginx-demo.serviceAccountName" . }}
+      containers:
+        - name: nginx
+          ...
+          {{- if .Values.existingSecret }}
+          envFrom:
+            - secretRef:
+                name: {{ .Values.existingSecret }}
+          {{- end }}
+```
+
+</details>
+
+<details>
+<summary>Hint: values.yaml configuration block</summary>
+
+```yaml
+serviceAccount:
+  create: true
+  name: ""
+  annotations: {}
+
+rbac:
+  create: false
+
+existingSecret: ""
+```
+
+</details>
 
 <details>
 <summary>Hint: helper in templates/_helpers.tpl</summary>

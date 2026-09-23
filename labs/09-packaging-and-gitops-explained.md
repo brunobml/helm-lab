@@ -15,10 +15,12 @@ Below are in-depth explanations and answers for the questions posed in the **Exp
 ### Question 1: What is the difference between a chart archive and a container image?
 
 #### TL;DR
+
 - A **container image** packages binary executables, dependencies, OS libraries, and filesystem layers to run a container (e.g. `nginx:1.30.4-alpine`).
 - A **chart archive** packages declarative Kubernetes configuration templates, default values, and metadata that instruct Kubernetes *how* to deploy and manage that container in a cluster.
 
 #### Deep Dive & Mechanism
+
 1. **Container Image:**
    - Built with `docker build`.
    - Contains compiled application binaries, runtime interpreters, and shared libraries.
@@ -36,9 +38,11 @@ Below are in-depth explanations and answers for the questions posed in the **Exp
 ### Question 2: Why is an explicit artifact version useful?
 
 #### TL;DR
+
 An explicit, immutable SemVer version (e.g. `0.2.0`) guarantees **idempotence, auditability, and reliable rollbacks**. Without it, teams cannot know what code was deployed at any given point in time.
 
 #### Deep Dive & Mechanism
+
 1. **The Risk of Mutable Tags (like `latest`):**
    - In container images or chart archives, mutable tags can be overwritten. If a deployment fails on Thursday, you cannot reproduce Tuesday's environment if `latest` was overwritten on Wednesday.
 2. **Immutable Artifacts in Production:**
@@ -51,9 +55,11 @@ An explicit, immutable SemVer version (e.g. `0.2.0`) guarantees **idempotence, a
 ### Question 3: Who owns deployment history when Argo CD renders a Helm chart?
 
 #### TL;DR
+
 **Argo CD and Git own the deployment history**, NOT Helm. Helm is used purely as a client-side templating engine (`helm template`).
 
 #### Deep Dive & Mechanism
+
 1. **How Helm Deploys Directly (`helm install` / `upgrade`):**
    - When you run Helm CLI commands, Helm creates and maintains versioned Secret objects in the cluster (`sh.helm.release.v1.demo-dev.v1`).
    - Release history, revisions, values, and rollbacks are stored and managed by Helm inside those Secrets.
@@ -71,10 +77,12 @@ An explicit, immutable SemVer version (e.g. `0.2.0`) guarantees **idempotence, a
 
 ## Break It and Recover — Detailed Walkthrough
 
-### What the challenge asks:
+### What the challenge asks
+>
 > Edit `pageContent` in the working chart and render the folder and archive separately. The archive must retain the packaged content. Restore the experimental edit; package a new chart version when you want a new artifact.
 
 #### 1. What to Break
+
 After running `helm package ./charts/nginx-demo --destination ./dist`, edit `pageContent` inside the working directory (`charts/nginx-demo/values.yaml`):
 
 ```yaml
@@ -82,33 +90,43 @@ pageContent: "<h1>Unpackaged Experimental Content</h1>"
 ```
 
 #### 2. Render Both the Directory and the Packaged Archive
+
 Render the local working directory:
+
 ```bash
 helm template test-dir ./charts/nginx-demo | grep -A 2 "index.html:"
 ```
+
 *Output:*
+
 ```yaml
   index.html: |
     <h1>Unpackaged Experimental Content</h1>
 ```
 
 Now render the packaged archive in `./dist`:
+
 ```bash
 helm template test-pkg ./dist/nginx-demo-0.2.0.tgz | grep -A 2 "index.html:"
 ```
+
 *Output:*
+
 ```yaml
   index.html: |
     <h1>Hello from Helm Lab</h1>
 ```
 
 #### 3. Why This Happened (Artifact Immutability)
+
 - A `.tgz` chart archive is an **immutable, compressed snapshot** of the chart files taken at the moment `helm package` was executed.
 - Modifying files in your working directory has zero effect on already-packaged archives or artifacts published to OCI registries.
 - **The Golden Rule of Packaging:** Never modify and republish a chart under the same version number. If you change templates or values, bump `version` in `Chart.yaml` (e.g. `0.2.1`) and produce a brand-new artifact.
 
 #### 4. How to Recover
+
 Restore the original `pageContent` in `charts/nginx-demo/values.yaml`:
+
 ```yaml
 pageContent: "<h1>Hello from Helm Lab</h1>"
 ```

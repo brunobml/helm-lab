@@ -1,5 +1,7 @@
 # Lab 5 review: Helpers and labels
 
+**Full re-run (third pass):** 2026-09-23 — every step re-executed end to end on a fresh kind cluster (Kubernetes v1.35.0), from an empty workspace, with k3d spot checks (Traefik Ingress, HPA). The items below were reproduced again unless marked otherwise.
+
 **Tested with:** Helm v3.19.0, kind (Kubernetes v1.35.0), 2026-09-22
 **Result:** This is the most beginner-friendly lab so far: step-by-step checks, a clear indentation table, and answers included. Every step works. The upgrade keeps the selector `{"app":"demo-dev"}`, the Pods get the five labels, and curl works. The experiment's claim is confirmed: a server-side dry run of the version-in-selector Deployment returns `spec.selector: Invalid value: ... field is immutable`. My templates match `lab-05-complete` (except for comments).
 

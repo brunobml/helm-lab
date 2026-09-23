@@ -19,7 +19,29 @@ creates it at a specific point in the release lifecycle and (for a `Job`) waits 
 it to finish. **Before you build it, predict:** if the hook Job fails during
 `helm upgrade`, will the Deployment still be updated?
 
-### Step 2: Create `charts/nginx-demo/templates/migration-job.yaml`
+### Step 2a: Add `nginx-demo.hookLabels` to `charts/nginx-demo/templates/_helpers.tpl`
+
+Append the following helper to `charts/nginx-demo/templates/_helpers.tpl`:
+
+```yaml
+{{/*
+Auxiliary and hook resource labels (excludes the Service selector label 'app: <release>')
+*/}}
+{{- define "nginx-demo.hookLabels" -}}
+app.kubernetes.io/name: {{ .Chart.Name }}
+app.kubernetes.io/instance: {{ .Release.Name }}
+app.kubernetes.io/version: {{ .Chart.AppVersion | quote }}
+app.kubernetes.io/managed-by: {{ .Release.Service }}
+app.kubernetes.io/component: migration
+{{- end -}}
+```
+
+> [!IMPORTANT]
+> **Label Isolation for Hooks and Auxiliary Pods:**
+> Notice that `nginx-demo.hookLabels` provides standard metadata but **omits** `app: {{ .Release.Name }}`.
+> Why? The application Service selects on `app: {{ .Release.Name }}`. If the migration Job Pod carries that selector label, Kubernetes registers the migration pod as a ready endpoint of the Service while the migration runs! Traffic will be routed to a pod that does not serve HTTP. Always keep hook and test pod labels decoupled from application Service selectors.
+
+### Step 2b: Create `charts/nginx-demo/templates/migration-job.yaml`
 
 This Job simulates a database migration. It runs before every install and upgrade.
 
@@ -58,11 +80,6 @@ spec:
               echo "Migration complete"
 {{- end }}
 ```
-
-> [!IMPORTANT]
-> **Label Isolation for Hooks and Auxiliary Pods:**
-> In `charts/nginx-demo/templates/_helpers.tpl`, define `nginx-demo.hookLabels` (which provides standard metadata but **omits** `app: {{ .Release.Name }}`).
-> Why? The application Service selector selects on `app: {{ .Release.Name }}`. If the migration Job Pod carries that selector label, Kubernetes will register the migration pod as a ready endpoint of the Service while the migration runs! Traffic will be routed to a pod that does not serve HTTP. Always keep hook and test pod labels decoupled from application Service selectors.
 
 What the annotations mean:
 
