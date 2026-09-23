@@ -4,6 +4,10 @@ Learn Helm by evolving one small NGINX application, one lab at a time.
 The working chart starts with a Deployment and Service. You implement the later
 features yourself; lab instructions explain what to change and how to verify it.
 
+> [!TIP]
+> Preparing for the Linux Foundation **SC104: Developing Helm Charts** certification?
+> See the [SC104 Study Guide & Competency Mapping](SC104/README.md) for 100% exam curriculum alignment, command cheat sheets, and trap walkthroughs.
+
 ## Names and layout
 
 | Name | Meaning |
