@@ -27,11 +27,11 @@ Below are in-depth explanations and answers for the questions posed in the **Exp
 
 2. **Persistent Volumes:**
    - In our lab, `/data` was mounted to `PersistentVolumeClaim/storage-demo-data`.
-   - When we ran `echo 'helm-persistence-test' > /data/marker.txt` and deleted the Pod (`kubectl delete pod ...`):
+   - When we ran `echo marker-1 > /data/marker` and deleted the Pod (`kubectl delete pod ...`):
      1. The old Pod was destroyed.
      2. Kubernetes scheduled a new replacement Pod.
      3. The `kubelet` reattached and mounted the same underlying storage volume (`pvc-7d1f8480...`) back into `/data`.
-     4. Reading `/data/marker.txt` from the replacement Pod returned the exact file intact.
+     4. Reading `/data/marker` from the replacement Pod returned the exact file intact.
 
 ---
 
@@ -39,12 +39,12 @@ Below are in-depth explanations and answers for the questions posed in the **Exp
 
 #### TL;DR
 
-Helm manages the **PVC resource**, but the **underlying storage disk (PersistentVolume / PV)** is governed by the StorageClass's `reclaimPolicy` (`Delete` vs `Retain`).
+Helm manages the **PVC resource**, but the **underlying storage disk (PersistentVolume / PV)** is governed by the StorageClass's `reclaimPolicy` (`Delete` vs `Retain`). To prevent Helm from deleting a PVC during uninstall, annotate it with `"helm.sh/resource-policy": keep`.
 
 #### Deep Dive & Mechanism
 
 1. **What happens during `helm uninstall`:**
-   - If the PVC is part of the Helm chart templates (`templates/pvc.yaml`), running `helm uninstall` **deletes the PVC**.
+   - If the PVC is part of the Helm chart templates (`templates/pvc.yaml`), running `helm uninstall` **deletes the PVC** by default.
 
 2. **The `reclaimPolicy` decides the physical disk's fate:**
    - **`reclaimPolicy: Delete` (Common in dev/cloud):**
@@ -52,7 +52,18 @@ Helm manages the **PVC resource**, but the **underlying storage disk (Persistent
    - **`reclaimPolicy: Retain` (Standard in enterprise production):**
      When the PVC is deleted, the PersistentVolume is marked as `Released`, but the underlying disk and data remain untouched on the storage backend. An administrator must manually reclaim or backup the disk.
 
-3. **Production Best Practice for State:**
+3. **Retaining PVCs via Helm Resource Policy:**
+   - If a PVC is managed by a Helm chart, annotate it with `"helm.sh/resource-policy": keep`:
+
+     ```yaml
+     metadata:
+       annotations:
+         "helm.sh/resource-policy": keep
+     ```
+
+   - Helm will orphan and keep the PVC upon `helm uninstall` or upgrade instead of deleting it.
+
+4. **Production Best Practice for State:**
    - For critical production databases, many teams **do not define the PVC inside the application's Helm chart**.
    - Instead, the PVC is provisioned separately (or via Terraform/GitOps), and the Helm chart merely references the pre-existing PVC by name, ensuring that an accidental `helm uninstall` cannot destroy production data.
 

@@ -1,36 +1,13 @@
 # Lab 13 review: Capstone, a three-tier release
 
-**Full re-run (third pass):** 2026-09-23 — every step re-executed end to end on a fresh kind cluster (Kubernetes v1.35.0), from an empty workspace, with k3d spot checks (Traefik Ingress, HPA). The items below were reproduced again unless marked otherwise.
-**I4 is now resolved in the chart** (see below).
+**Fourth pass:** 2026-09-23 against `cafc1b2`. Cleaned up first. Then every step was re-executed on a fresh kind cluster (Kubernetes v1.35.0, Helm v3.19.0) from an empty workspace, with code taken verbatim from the lab text, plus k3d spot checks. Items fixed in earlier passes are not repeated. The previous report version is in git history (`git log -p -- labs/reviews/`).
 
-**Tested with:** Helm v3.19.0, sops 3.13.3, helm-secrets 4.8.0-dev, helm-unittest 1.1.2, ct v3.14.0, gpg 2.4.4, `postgres:16-alpine`, `postgrest/postgrest:v12.2.3`, kind (Kubernetes v1.35.0), 2026-09-22
-**Result:** This is the best lab in the series. Every file in the lab text is byte-identical to `lab-13-complete`, and **every** expected output reproduced:
+**Verified:** Every step and break-it reproduced again (render counts, deploy, idempotent seed, failed post-hook `desired=2`, `--atomic`, DB restart recovery, the rotation trap and fix, 34 unit tests, ct, the signed OCI install, the label hijack, and build order).
 
-- The `required` render failure, the kind counts, and `PGRST_DB_URI ... p%40ss%2Fw%3Ard`.
-- `shop-dev` deployed in about 27 s, and both tests pass (`[{"id":1,"name":"first item"}]`).
-- Idempotent seeding (`first item` id 1, `second item` id **3**, exactly as explained).
-- The failed post-upgrade hook with `desired=2`, and the `--atomic` rollback.
-- The DB restart: API Pods at `0/1` for about 55 s, then `RESTARTS 1` and `1/1`, with the rows surviving on the PVC.
-- The password-rotation trap: `FATAL: password authentication failed`, the API Pod not restarted, then the documented fix.
-- `helm unittest`: 34 passed. `ct lint --all`: 7 charts. `ct install shop`: passes.
-- The signed OCI package verifies, and `shop-oci` installs from it.
-- All 5 break-its, including the label hijack (3 of 6 requests `Connection refused`, 3 served `<h1>Shop (dev)</h1>`) and `no template "lab-common.labels"`.
+## Still open (minor)
 
-The cleanup commands left nothing behind.
-
-## Issues
-
-- **I1: Hidden dependency on the optional extensions.** Step 9 expects "**1 ServiceAccount**" among the rendered kinds. That object comes from the *Identity extension* (`serviceAccount.create: true`). A learner who skipped the "optional" extensions sees no ServiceAccount and a different count. The same goes for Lab 10+ generally: `lab-10-complete` already contains all extension files. Either make the extensions officially part of the core path (between Lab 9 and 10, as the tags imply), or word the expectation as "... 1 ServiceAccount (if you did the Identity extension)".
-- **Note:** `main` now pins `nginx-demo` as `">=0.5.0 <=0.6.0"`, and a fresh clone builds `shop` (verified). The lab text still shows `version: 0.5.0`, which is correct at Lab 13 time.
-- **I2: Stale "Roadmap" references.** The lab's Explain section and explained Q6 say "compare with the Roadmap's Lab 16", but Lab 16 now exists. Link to `16-production-hardening-and-best-practices.md` instead.
-- **I3: Duplicated output from `kubectl run --rm -i -q`.** The "Follow the data" command printed the JSON twice (`[{...}][{...}]`) on kubectl 1.35: once from the attach stream and once from the logs fallback (confirmed in the re-run: kubectl prints `warning: couldn't attach to pod/curl, falling back to streaming logs`). It's harmless, but learners may think two requests were made. `kubectl run ... --attach --rm` or `kubectl exec` into an existing Pod avoids it.
-- **I4 (chart resolved, doc still open):** `main`'s migration Job now uses `nginx-demo.hookLabels`, so even with `web.migration.enabled=true` the Pod carries no `app:` label (verified). Explained Q1.5 lists places where the `app: <release>` assumption can hide, but misses the most relevant one: **`nginx-demo`'s own Lab 10 migration Job**, whose Pod template carries `app: <release>` and does become a web Service endpoint while it runs (see the Lab 10 review B1). The capstone avoids it only because `web.migration.enabled: false`. Worth naming explicitly, since it's the same bug inside the chart the learner wrote.
-- **I5:** Many steps write to fixed `/tmp/...` paths (`/tmp/shop.yaml`, `/tmp/shop-pkg`, `/tmp/shop-pull`). Use one `LAB_TMP=$(mktemp -d)` for the lab (same suggestion as Lab 12).
-
-## Ease-of-following suggestions
-
-- **S1:** The lab is about 1,250 lines, mostly "create this file with this content". Offer a one-shot option (`git checkout lab-13-complete -- charts/shop charts/shop-api charts/shop-db`) for learners who want to focus on Parts D–H operations, with the file-by-file build as the full path.
-- **S2:** In Step 13, the `kubectl get pods ... -w` watch is interactive. Mention `timeout 120 kubectl get pods ... -w` so the command ends by itself.
-- **S3:** In Step 14, after the rotation, `secrets.dev.yaml` holds `rotated-Passw0rd`. That's correct, and the Step 17 note explains why `shop-oci` still works. Also mention it in the cleanup section: if the learner later reinstalls `shop-dev` from scratch, the new password is what's used.
-- **S4:** Part H: the warning that the layout "cannot be built from Git alone" is accurate, but the reason could be sharper. **Verified on Argo CD (stable):** Argo CD *does* resolve a single level of `file://` dependencies from Git (Lab 9's `nginx-demo` → `lab-banner` synced with no committed archives). For `charts/shop` it fails with `ComparisonError ... executing "nginx-demo.labels" at <include "lab-common.labels" .>: no template "lab-common.labels" associated with template "gotpl"`, the same error as break-it 4. Argo CD packages `shop`'s direct dependencies but not `nginx-demo`'s own. Quoting this real error would connect Part H to break-it 4 nicely.
-- **S5:** Break it 4's `rm charts/nginx-demo/charts/*.tgz charts/shop/charts/*.tgz` is destructive for anyone who hasn't run dependency builds recently. It's fine in a lab, but add "these are regenerated by `helm dependency build`" right next to the `rm`.
+- **I1:** Step 9's "1 ServiceAccount" depends on the optional Identity extension.
+- **I2:** "compare with the Roadmap's Lab 16" is still in the lab (line ~1222). Link to Lab 16.
+- **I3:** `kubectl run --rm -i -q` prints the output twice (`couldn't attach to pod ..., falling back to streaming logs`).
+- **I5:** Fixed `/tmp/...` paths.
+- **S1–S5** as before.

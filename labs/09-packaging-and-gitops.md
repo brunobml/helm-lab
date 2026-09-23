@@ -144,7 +144,7 @@ helm template demo-oci "oci://$LAB_REGISTRY/$LAB_REGISTRY_NAMESPACE/nginx-demo" 
 >   argocd login localhost:8443 --username admin --password "$ARGOCD_PWD" --insecure --grpc-web
 >   ```
 >
-> - If you do not have an external Git remote, you can serve a local Git daemon: `git daemon --export-all --base-path=. --port=9418` and use `repoURL: git://<host-ip>/helm-lab.git`.
+> - If you do not have an external Git remote, you can serve a local Git daemon: `git daemon --export-all --base-path=. --port=9418` and use `repoURL: git://<host-ip>/` (with `--base-path=.`, the repo root is served at `/`). Note that `<host-ip>` must be reachable from cluster pods (e.g. WSL2 `eth0` IP or docker bridge IP), and that this daemon exposes repository refs without authentication on port 9418.
 > - If you do not have Argo CD or an external Git remote configured, completing **Part A and Part B** fulfills all core Helm packaging and OCI registry learning objectives!
 
 For this exercise, Argo CD reads the chart from Git. Commit the chart, child
@@ -210,11 +210,19 @@ change, push, and sync to practice recovery.
 
 ## Break it and recover
 
-Test packaging drift detection:
+Test packaging drift detection and artifact immutability:
 
-1. Temporarily modify `pageContent` in `charts/nginx-demo/values-dev.yaml`.
-2. Notice that if you install or render from the pre-packaged archive (`helm template dist/nginx-demo-0.2.0.tgz`), Helm renders from the archive content and ignores unpacked changes made in the chart directory.
-3. Re-package with `helm package charts/nginx-demo -d dist` to update the archive before deploying. Restore `values-dev.yaml`.
+1. Temporarily modify the chart's defaults in `charts/nginx-demo/values.yaml` (for example, change `replicaCount: 2` to `replicaCount: 5`).
+2. Render from the pre-packaged archive:
+
+   ```bash
+   helm template dist/nginx-demo-0.2.0.tgz | grep -A 2 'replicas:'
+   ```
+
+   Notice that Helm renders from the archived package (`replicas: 2`) and completely ignores unpacked changes made in `charts/nginx-demo/`. The package archive is immutable!
+3. To package the changes, honor SemVer and artifact immutability by bumping the chart `version: 0.2.1` in `charts/nginx-demo/Chart.yaml`, then run `helm package charts/nginx-demo -d dist`.
+4. Render the new archive `helm template dist/nginx-demo-0.2.1.tgz | grep -A 2 'replicas:'` and verify it renders `replicas: 5`.
+5. Restore `replicaCount: 2` in `values.yaml` and `version: 0.2.0` in `Chart.yaml`, and remove `dist/nginx-demo-0.2.1.tgz`.
 
 ## Explain
 

@@ -492,7 +492,7 @@ The upgrade succeeds cleanly!
 | :--- | :--- | :--- |
 | **Apply Engine** | Client-Side 3-Way Strategic Merge Patch | Kubernetes Server-Side Apply (SSA) |
 | **Field Management** | Helm calculates client diff; Last-write-wins | `fieldManager=helm`; Conflicts detected via Kubernetes `managedFields` |
-| **CRD Upgrades** | CRDs in `crds/` ignored on upgrade | Server-Side Apply allows managing CRDs declaratively |
+| **CRD Upgrades** | CRDs in `crds/` ignored on upgrade | Install-only by default; external CRD managers or dedicated charts recommended |
 | **Failure Flags** | `--atomic` / `--cleanup-on-fail` | Streamlined flags (e.g. `--rollback-on-failure`) |
 | **Force Flag** | `--force` | Replaced by `--force-replace` |
 | **Post-rendering** | Executable binary only | Plugin-based post-renderers supported |
@@ -585,14 +585,14 @@ If `helm rollback` is blocked or unavailable (for example, if the initial instal
 *(Note: If you already ran Option A above, re-run the python patch snippet to put the release back into `pending-upgrade` first before testing Option B).*
 
 ```bash
-# Delete the pending Secret:
-kubectl delete secret "${SECRET_NAME}" -n helm-internals
+# Delete all pending-upgrade Secrets for the release (using label selector):
+kubectl delete secret -n helm-internals -l owner=helm,name=internals-demo,status=pending-upgrade
 
 # Verify the release can now be upgraded cleanly:
 helm upgrade internals-demo charts/nginx-demo -n helm-internals --set replicaCount=1
 ```
 
-*(Note: In `helm history`, you may see the superseded or skipped revision numbers. Helm revisions are monotonically increasing sequence numbers and do not need to be consecutive).*
+*(Note: Deleting by label `status=pending-upgrade` ensures any older interrupted revisions left in `pending-upgrade` by Option A are cleared alongside the current one. In `helm history`, you may see non-consecutive revision numbers, which is normal).*
 
 The release upgrades successfully!
 

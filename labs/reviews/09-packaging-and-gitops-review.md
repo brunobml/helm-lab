@@ -1,38 +1,16 @@
 # Lab 9 review: Packaging and GitOps
 
-**Full re-run (third pass):** 2026-09-23 — every step re-executed end to end on a fresh kind cluster (Kubernetes v1.35.0), from an empty workspace, with k3d spot checks (Traefik Ingress, HPA). The items below were reproduced again unless marked otherwise.
+**Fourth pass:** 2026-09-23 against `cafc1b2`. Cleaned up first. Then every step was re-executed on a fresh kind cluster (Kubernetes v1.35.0, Helm v3.19.0) from an empty workspace, with code taken verbatim from the lab text, plus k3d spot checks. Items fixed in earlier passes are not repeated. The previous report version is in git history (`git log -p -- labs/reviews/`).
 
-**Re-validated:** 2026-09-23 against `44d3404` (Helm v3.19.0, Argo CD stable, kind v1.35.0).
+**Verified fixed:** The non-interactive login (`--password "$ARGOCD_PWD"`), the explicit refresh/diff/sync commands (`|| true` for the diff exit code), and the server-side Argo CD install. Part C passed end to end: Synced/Healthy, change to 2/2, revert to 1/1.
 
-**Fixed and verified:** the Argo CD install now uses `--server-side --force-conflicts` (it applies with 0 errors), the `kubectl wait` works, and the new login block works (`argocd admin initial-password -n argocd` prints the password; `argocd login ... --insecure --grpc-web` was already verified).
+## New bugs
 
-## Still open
+- **N2 (medium): The local `git daemon` hint uses the wrong URL.** `git daemon --export-all --base-path=. --port=9418` run in the repo root, with `repoURL: git://<host-ip>/helm-lab.git`, fails with `access denied or repository not exported: /helm-lab.git`. With `--base-path=.`, the repository is served at `git://<host-ip>/` (verified, and Argo CD synced from it). Either use `repoURL: git://<host-ip>/`, or run from the parent directory with `--base-path=..` and `git://<host-ip>/helm-lab`. Also note that this exposes every ref on port 9418 to the network, and that on Docker Desktop/WSL2 `<host-ip>` is the WSL `eth0` address.
+- **N3 (medium): The new break-it doesn't demonstrate archive immutability.** It edits `values-dev.yaml`, but that file isn't part of the chart's defaults, and learners always pass it with `-f` from disk. Rendering the archive with `-f charts/nginx-demo/values-dev.yaml` **does** show the change (verified). Edit `values.yaml` or a template instead, which is what the explained page does. Also, "re-package ... to update the archive" re-publishes the **same** version 0.2.0, which contradicts the lab's immutable-version lesson. Bump the version instead.
 
-### B2: The explained break-it refers to a challenge that isn't in the lab (medium)
+## Still open (minor)
 
-`09-packaging-and-gitops-explained.md` still walks through "Edit `pageContent`... render the folder and archive separately", but the lab has no "Break it and recover" section. Add it back to the lab. The explained "restore" snippet is also still a one-line `pageContent`, not Lab 6's two-line default.
-
-### M2: The Git remote is still a hard blocker (medium)
-
-The prerequisites still require a GitHub/GitLab remote. A local option works (verified in the first review): serve a bare repo with `git daemon --export-all --base-path=<dir> --port=9418` and use `repoURL: git://<host-ip>/helm-lab.git`. On Docker Desktop + WSL2, use the WSL `eth0` IP, because the kind gateway refuses the connection.
-
-### M3: The GitOps change/revert steps have no commands (low)
-
-"Change the dev replica count in Git, commit, push, refresh..." Add `argocd app get nginx-demo --refresh`, `argocd app diff nginx-demo` (note that it exits **1** when a diff exists), and `argocd app sync nginx-demo`.
-
-### New N1: The new `argocd login` line prompts for a password (low)
-
-`argocd login localhost:8443 --username admin --insecure --grpc-web` has no `--password`, so it stops at an interactive prompt after the learner has just printed the password with `argocd admin initial-password`. Either tell learners to paste it, or use `--password "$(argocd admin initial-password -n argocd | head -1)"` (verified).
-
-The full re-run also confirmed Part C end to end with the local `git daemon` remote: Synced/Healthy, change to 2/2, revert to 1/1, with no Helm release and no test Pod in `helm-lab-gitops`.
-
-### Minor (unchanged)
-
-- **I1:** Expected `saved it to: ./dist/...` → Helm prints `dist/...`.
-- **I2:** Explained Q2: `registry:2` silently overwrites a re-pushed tag (re-verified: pushing `0.2.0` twice succeeds both times). Say so.
-- **I3:** Explained Q3: Argo CD doesn't run `helm test` hooks.
-- **S1:** Mention `helm package --dependency-update`.
-- **S2:** The `localhost:5001` registry isn't reachable from inside kind, so an OCI-sourced Argo Application isn't possible as-is.
-- **S3:** Say what to do with `gitops/nginx-demo.yaml` (don't commit a personal repo URL to the shared repo).
-- **S4:** Cleanup deletes `helm-registry`, but Labs 12/13 recreate it. Mention that.
-- **S5:** Give the namespace delete command.
+- **I1:** Expected `saved it to: ./dist/...`. Helm prints `dist/...`.
+- **I2 / I3:** `registry:2` overwrites re-pushed tags; Argo CD doesn't run `helm test` hooks.
+- **S1–S5** as before.

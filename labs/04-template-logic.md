@@ -104,7 +104,8 @@ resources:
 
 Inside `range`, try accessing `.Release.Name`. Observe the rendering error, then
 use `$.Release.Name` to access the original root context. Restore the intended
-output. Also try a wrong indentation level and inspect where `env` lands.
+output. Also try a wrong indentation level (such as `nindent 8` on `resources`)
+and observe the YAML parse error with `helm template --debug`.
 
 ## Explain
 

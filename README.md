@@ -1,8 +1,9 @@
 # Helm Lab
 
 Learn Helm by evolving one small NGINX application, one lab at a time.
-The working chart starts with a Deployment and Service. You implement the later
-features yourself; lab instructions explain what to change and how to verify it.
+The starter scaffold (`lab-00-start`) starts with a minimal Deployment and Service. You implement the later
+features yourself; lab instructions explain what to change, what pitfalls to watch for, and how to verify it.
+The `main` branch contains the fully completed, hardened reference code (from Lab 18).
 
 > [!TIP]
 > Preparing for the Linux Foundation **SC104: Developing Helm Charts** certification?
@@ -33,9 +34,8 @@ Use Bash (or a compatible shell), Git, Helm, kubectl, curl, and a disposable
 Kubernetes cluster. You should recognize a Pod, Deployment, Service, and namespace;
 Lab 1 connects those objects to Helm.
 
-Local linting and rendering were checked with **Helm 3.19.0**. Cluster exercises
-have not been executed as part of this restructuring. Record your Helm and
-Kubernetes server versions in your learning notes. These instructions use Helm 3
+All labs and extensions have been verified end-to-end on Kubernetes v1.35.0 (kind and k3d) and Helm v3.19.0.
+Record your Helm and Kubernetes server versions in your learning notes. These instructions use Helm 3
 semantics; consult the matching documentation if using another major version.
 
 For a local cluster, install Docker and either [kind](https://kind.sigs.k8s.io/docs/user/quick-start/)
@@ -191,6 +191,9 @@ Want to practice a specific topic (e.g., Lab 4: Template Logic or Lab 6: ConfigM
    ```bash
    git diff lab-04-complete
    ```
+
+> [!NOTE]
+> Each tag `lab-NN-complete` marks the reference state at the completion of Lab NN. When practicing and creating checkpoint tags locally, name your tags `my-lab-NN-complete` (e.g., `git tag my-lab-01-complete`) so you do not collide with the repository's reference tags.
 
 #### Approach 3: Practice in a separate folder via Git worktree (Zero conflict)
 

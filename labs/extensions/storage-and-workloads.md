@@ -154,6 +154,8 @@ metadata:
     app: {{ .Release.Name }}
 spec:
   replicas: {{ .Values.replicaCount }}
+  strategy:
+    type: Recreate
   selector:
     matchLabels:
       app: {{ .Release.Name }}
@@ -178,6 +180,79 @@ spec:
           persistentVolumeClaim:
             claimName: {{ .Release.Name }}-data
       {{- end }}
+```
+
+</details>
+
+<details>
+<summary>Hint: Step 4 workload patterns (Job, CronJob, StatefulSet)</summary>
+
+```yaml
+# Job pattern (run-to-completion batch task):
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ .Release.Name }}-job
+spec:
+  backoffLimit: 2
+  template:
+    spec:
+      restartPolicy: OnFailure
+      containers:
+        - name: task
+          image: busybox:1.36
+          command: ["sh", "-c", "echo 'Batch job complete'"]
+
+---
+# CronJob pattern (recurring scheduled task):
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: {{ .Release.Name }}-cronjob
+spec:
+  schedule: "0 * * * *"
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          restartPolicy: OnFailure
+          containers:
+            - name: backup
+              image: busybox:1.36
+              command: ["sh", "-c", "echo 'Backup task finished'"]
+
+---
+# StatefulSet pattern (dedicated per-Pod PVCs via volumeClaimTemplates):
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: {{ .Release.Name }}-stateful
+spec:
+  serviceName: {{ .Release.Name }}-headless
+  replicas: 1
+  selector:
+    matchLabels:
+      app: {{ .Release.Name }}-stateful
+  template:
+    metadata:
+      labels:
+        app: {{ .Release.Name }}-stateful
+    spec:
+      containers:
+        - name: db
+          image: busybox:1.36
+          command: ["sh", "-c", "while true; do sleep 3600; done"]
+          volumeMounts:
+            - name: stateful-data
+              mountPath: /data
+  volumeClaimTemplates:
+    - metadata:
+        name: stateful-data
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        resources:
+          requests:
+            storage: 100Mi
 ```
 
 </details>

@@ -10,6 +10,10 @@
 3. Add optional `autoscaling/v2` HPA output controlled by `autoscaling.enabled`.
 4. When HPA is enabled, omit Deployment `spec.replicas` so Helm does not keep
    overwriting the autoscaler's desired count. Set CPU requests for utilization targets.
+
+   > [!WARNING]
+   > When `spec.replicas` is omitted upon enabling HPA, the Kubernetes Deployment controller defaults `spec.replicas` to `1` until the HPA controller evaluates metrics and writes its desired count (or defaults to `minReplicas`). If your workload was running multiple replicas, this transition causes an immediate temporary scale-down if HPA metrics are not yet established.
+
 5. For live scaling, ensure your cluster has a working resource metrics provider.
 
 ## Verify
@@ -140,6 +144,40 @@ spec:
           averageUtilization: {{ .Values.autoscaling.targetCPUUtilizationPercentage }}
     {{- end }}
 {{- end }}
+```
+
+</details>
+
+<details>
+<summary>Hint: values.yaml configuration block</summary>
+
+```yaml
+livenessProbe:
+  httpGet:
+    path: /
+    port: 80
+  initialDelaySeconds: 5
+  periodSeconds: 10
+
+readinessProbe:
+  httpGet:
+    path: /
+    port: 80
+  initialDelaySeconds: 2
+  periodSeconds: 5
+
+startupProbe:
+  httpGet:
+    path: /
+    port: 80
+  failureThreshold: 30
+  periodSeconds: 10
+
+autoscaling:
+  enabled: false
+  minReplicas: 1
+  maxReplicas: 5
+  targetCPUUtilizationPercentage: 80
 ```
 
 </details>

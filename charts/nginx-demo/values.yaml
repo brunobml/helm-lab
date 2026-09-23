@@ -91,6 +91,9 @@ readinessProbe:
     path: /
     port: 8080
 
+# -- Startup probe configuration.
+startupProbe: {}
+
 autoscaling:
   enabled: false
   minReplicas: 1

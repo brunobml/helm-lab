@@ -50,7 +50,7 @@ The child **cannot** see any other parent values (e.g., `replicaCount`, `image`,
 
 #### TL;DR
 
-- **Commit `Chart.lock`:** It guarantees deterministic, reproducible builds by pinning the exact version and checksum of every dependency.
+- **Commit `Chart.lock`:** It guarantees deterministic, reproducible builds by pinning the exact version and repository/digest of declared dependencies.
 - **Ignore `charts/*.tgz`:** Compressed archives are compiled binary build artifacts. Storing them in Git causes repository bloat and merge conflicts.
 
 #### Deep Dive & Mechanism
@@ -58,7 +58,7 @@ The child **cannot** see any other parent values (e.g., `replicaCount`, `image`,
 1. **The Role of `Chart.lock`:**
    - Similar to `package-lock.json` in Node.js, `Cargo.lock` in Rust, or `poetry.lock` in Python.
    - When you declare a dependency in `Chart.yaml` with SemVer ranges (e.g., `version: ^1.2.0`), `helm dependency update` resolves the newest matching version and records its exact version, repository URL, and cryptographic digest in `Chart.lock`.
-   - Committing `Chart.lock` ensures that teammates, CI/CD pipelines, and GitOps engines install the exact same dependency versions every time.
+   - Committing `Chart.lock` ensures that teammates, CI/CD pipelines, and GitOps engines install the exact same dependency versions every time. (Note: For local `file://` dependencies, the digest records the dependency declaration rather than hashing every file in the child source directory; Git tracks the source files).
 2. **Why `.gitignore` generated archives (`charts/*.tgz`):**
    - Storing tarballs in Git bloats the repository size over time because Git stores binary diffs inefficiently.
    - Anyone cloning the repository can recreate the exact `charts/` folder in one second by running `helm dependency build`.

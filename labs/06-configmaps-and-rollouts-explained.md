@@ -8,11 +8,70 @@
 
 In Lab 6, you mounted custom HTML into NGINX using a ConfigMap, and implemented the standard Helm pattern for triggering automatic Deployment rollouts via the `checksum/config` Pod-template annotation.
 
-Below are in-depth explanations and answers for the questions posed in the **Explain** section.
+Below are in-depth explanations and answers for the questions posed in the **Explain** and **Check your understanding** sections.
 
 ---
 
-### Question 1: Why does hashing the ConfigMap change the Deployment's Pod template?
+### Question 1: How does `pageContent` become a file inside NGINX?
+
+#### TL;DR
+
+Helm places the value of `pageContent` into the `data.index.html` key of a `ConfigMap`. In the Deployment, that ConfigMap is declared as a `volume`, and that volume is mounted into the NGINX container at `/usr/share/nginx/html`. Kubernetes automatically projects the ConfigMap key as a physical file on the container filesystem.
+
+#### Deep Dive & Mechanism
+
+1. **The ConfigMap Template (`templates/configmap.yaml`):**
+   Helm evaluates `.Values.pageContent` and renders it under `data:` with key `index.html`:
+
+   ```yaml
+   apiVersion: v1
+   kind: ConfigMap
+   metadata:
+     name: {{ .Release.Name }}-page
+   data:
+     index.html: |
+       {{- .Values.pageContent | nindent 4 }}
+   ```
+
+2. **The Pod Volume Declaration (`spec.template.spec.volumes`):**
+   The Deployment declares a volume backed by the ConfigMap:
+
+   ```yaml
+   volumes:
+     - name: html
+       configMap:
+         name: {{ .Release.Name }}-page
+   ```
+
+3. **The Container Mount (`spec.template.spec.containers[0].volumeMounts`):**
+   The volume is mounted into NGINX's default web directory:
+
+   ```yaml
+   volumeMounts:
+     - name: html
+       mountPath: /usr/share/nginx/html
+       readOnly: true
+   ```
+
+   When the container starts, `kubelet` creates a volume populated with `index.html`, and mounts it over `/usr/share/nginx/html`. NGINX serves this file whenever an HTTP request arrives for `/`.
+
+---
+
+### Question 2: What connects `volumeMounts` to `volumes`?
+
+#### TL;DR
+
+The **`name`** field. Both `spec.template.spec.volumes[].name` and `spec.template.spec.containers[].volumeMounts[].name` must match exactly (e.g. `name: html`).
+
+#### Deep Dive & Mechanism
+
+- `volumes` defines **what storage exists** at the Pod level (ConfigMap, Secret, PersistentVolumeClaim, emptyDir, hostPath).
+- `volumeMounts` defines **where inside a specific container** that storage is attached and whether it is read-only or read-write.
+- Because a Pod can contain multiple containers and multiple volumes, Kubernetes pairs them using the unique volume `name`. If `volumeMounts[0].name` does not match any entry in `spec.volumes`, the Kubernetes API server rejects the Deployment with a validation error (`spec.template.spec.containers[0].volumeMounts[0].name: Not found: "..."`).
+
+---
+
+### Question 3: Why does the checksum belong under `spec.template.metadata`?
 
 #### TL;DR
 
@@ -37,21 +96,20 @@ Kubernetes Deployments **only trigger a rollout when `spec.template` changes**. 
    - `include (print $.Template.BasePath "/configmap.yaml") .` renders the exact YAML content of the ConfigMap template.
    - `sha256sum` calculates a cryptographic SHA-256 hash of that rendered text (e.g., `a3579b50...`).
    - When values like `pageContent` change, the generated hash changes.
-   - Because this annotation lives inside `spec.template.metadata`, the Deployment controller detects a mutated Pod template and initiates an automated rolling update.
+   - Because this annotation lives inside `spec.template.metadata`, the Deployment controller detects a mutated Pod template and initiates an automated rolling update. Placing the checksum at root `metadata.annotations` does *not* roll the Pods because it does not alter `spec.template`.
 
 ---
 
-### Question 2: How do you distinguish a file update from a Pod replacement?
+### Question 4: Does seeing updated HTML prove that a Pod was replaced?
 
 #### TL;DR
 
-- **Pod replacement:** Creates a brand-new Pod with a new Pod name (e.g., `demo-dev-deployment-79b889cb9c-2pqsr` $\rightarrow$ `demo-dev-deployment-86c5dc48bb-qvx8v`) and a fresh start time / age (`2s`).
-- **File update:** The existing Pod name and age remain unchanged (`age: 15m`), but the file content on disk inside the container eventually syncs in the background.
+**No.** Kubernetes periodically synchronizes mounted ConfigMap files to running containers in the background without restarting or replacing Pods. Seeing updated HTML only proves that the file on disk changed; verifying a rollout requires checking the Pod names, Pod IDs, or creation age.
 
 #### Deep Dive & Mechanism
 
 1. **Volume Sync vs. Container Restart:**
-   - When a ConfigMap is mounted as a directory (without `subPath`), the `kubelet` syncs updated ConfigMap data to the mounted volume periodically (typically every 60–90 seconds via its sync loop).
+   - When a ConfigMap is mounted as a directory (without `subPath`), `kubelet` syncs updated ConfigMap data to the mounted volume periodically (typically every 60–90 seconds via its sync loop).
    - For **static content** (like NGINX reading `index.html` from disk on each HTTP request), the updated file is served immediately once the kubelet syncs it to disk—even though the Pod was never restarted!
    - However, for **application configuration read at startup** (such as `nginx.conf`, database connection pools, or environment variables in Python/Java/Go), the process retains the old configuration in memory unless restarted or reloaded.
 2. **Why a Rolling Update is Superior:**
@@ -63,7 +121,7 @@ Kubernetes Deployments **only trigger a rollout when `spec.template` changes**. 
 
 ---
 
-### Question 3: Why does indentation matter for multiline HTML?
+### Question 5: Why does indentation matter for multiline HTML?
 
 #### TL;DR
 
@@ -152,7 +210,7 @@ demo-dev-deployment-7bb9cf9475-abc12   1/1     Running   0          45s
 Now modify `pageContent` to change the ConfigMap's checksum:
 
 ```bash
-helm upgrade demo-dev ./charts/nginx-demo -n helm-lab --set pageContent="<h1>Rollout Test</h1>" --wait --timeout 120s
+helm upgrade demo-dev ./charts/nginx-demo -n helm-lab --reset-values -f ./charts/nginx-demo/values-dev.yaml --set pageContent="<h1>Rollout Test</h1>" --wait --timeout 120s
 ```
 
 Now check the Pods again:

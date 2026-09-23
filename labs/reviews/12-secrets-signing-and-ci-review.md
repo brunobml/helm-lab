@@ -1,22 +1,11 @@
 # Lab 12 review: Secrets, signing, and CI
 
-**Full re-run (third pass):** 2026-09-23 — every step re-executed end to end on a fresh kind cluster (Kubernetes v1.35.0), from an empty workspace, with k3d spot checks (Traefik Ingress, HPA). The items below were reproduced again unless marked otherwise.
+**Fourth pass:** 2026-09-23 against `cafc1b2`. Cleaned up first. Then every step was re-executed on a fresh kind cluster (Kubernetes v1.35.0, Helm v3.19.0) from an empty workspace, with code taken verbatim from the lab text, plus k3d spot checks. Items fixed in earlier passes are not repeated. The previous report version is in git history (`git log -p -- labs/reviews/`).
 
-**Re-validated:** 2026-09-23 against `44d3404` (Helm v3.19.0, ct v3.14.0, sops 3.13.3). Re-run from the Lab 12 state.
-
-**Fixed and verified:**
-
-- **B1:** Step 20's local self-remote recipe works verbatim. `ct lint --remote ctlocal --target-branch ct-base` gives `chart version not ok. Needs a version bump!`, then after bumping to 0.5.1 gives `All charts linted successfully`. The teardown (`git switch - && git branch -D bump-test ct-base && git remote remove ctlocal`) leaves only `origin`.
-- **B2:** Break-it 5 now uses `sops --decrypt` and prints `Failed to get the data key required to decrypt the SOPS file.`.
+**Verified:** The whole lab passes as written: SOPS, rotation, 20/20 unit tests, GPG sign and verify, OCI with verify, cosign, `ct lint`/`ct install`, the Step 20 gate, and the break-its.
 
 ## Still open (minor)
 
-- **I1:** Step 12 exports `pubring.gpg`/`secring.gpg` **into** `$GNUPGHOME`, so the next gpg call prints `starting migration from earlier GnuPG versions`. Export to a sibling directory, or mention that the message is expected.
-- **I2:** `helm plugin install` for helm-secrets/helm-unittest is unpinned (it installed `4.8.0-dev`). Add `--version`.
-- **I3:** `sops --encrypt` reformats YAML to 4-space indentation. Mention it.
-- **I4:** Step 2 "Append to `.gitignore`": the lines already exist on `main`. Say "make sure it contains".
-- **S1:** The lab is about 950 lines. Consider splitting it (12a SOPS + unittest, 12b signing + CI) or adding per-part checkpoints.
-- **S2:** Replace the fixed `/tmp/...` paths with one `LAB_TMP=$(mktemp -d)`, and add `cd -` after Step 16's `cd /tmp`.
-- **S3:** Capture the push digest automatically: `DIGEST=$(helm push ... 2>&1 | awk '/Digest/{print $2}')`.
-- **S5:** Add a unit test asserting that the migration Job Pod has no `app:` selector label. That guards the Lab 10 fix (`hookLabels`) against regressions.
-- **S6:** Pin GitHub Actions by SHA (supply-chain theme).
+- **I1:** Exporting `pubring.gpg`/`secring.gpg` into `$GNUPGHOME` makes gpg print `starting migration from earlier GnuPG versions` (re-observed).
+- **I2:** The `helm plugin install` commands are unpinned.
+- **I3, I4, S1–S3, S5, S6** as before.

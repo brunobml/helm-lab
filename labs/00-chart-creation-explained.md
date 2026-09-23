@@ -24,10 +24,10 @@ Below are in-depth explanations and answers for the questions posed in the **Exp
 1. **Chart `version` (SemVer required):**
    - Helm uses `version` for dependency resolution, repository indexing (`index.yaml`), OCI tag management, and package archiving.
    - When you run `helm package`, Helm names the resulting archive `<chart-name>-<version>.tgz` (e.g., `nginx-demo-0.1.0.tgz`).
-   - If `version` is not valid SemVer (e.g., `1` or `latest`), `helm lint` and `helm package` will fail with an error:
+   - If `version` is not valid SemVer (e.g., `latest` or `1.0.0.1`), `helm lint` and `helm package` will fail with an error:
 
      ```text
-     [ERROR] Chart.yaml: version "1" is not a valid SemVer
+     [ERROR] Chart.yaml: version 'latest' is not a valid SemVer
      ```
 
    - **When to bump `version`:** Every single time you change anything in the chart—whether you edited a template, added a default value, or bumped `appVersion`.

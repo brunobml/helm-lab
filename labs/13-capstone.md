@@ -1219,7 +1219,7 @@ kubectl get pvc -n helm-lab | grep shop-prod
   so a rotation is safe (think: where could a checksum annotation live, and what is Reloader for)?
 - Why use liveness probes that check the dependency, and what could go wrong with them?
 - Which parts of this design change if the release is deployed by Argo CD instead of `helm secrets`?
-- What would you change before running this in production? (Answer from Labs 10-12, then compare with the Roadmap's Lab 16.)
+- What would you change before running this in production? (Answer from Labs 10-12, then compare with [Lab 16: Production hardening and chart best practices](16-production-hardening-and-best-practices.md).)
 
 > [!TIP]
 > See [13-capstone-explained.md](13-capstone-explained.md) for detailed explanations.

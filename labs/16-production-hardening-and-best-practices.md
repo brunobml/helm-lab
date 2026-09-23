@@ -49,9 +49,14 @@ readinessProbe:
   httpGet:
     path: /
     port: 8080
+
+startupProbe:
+  httpGet:
+    path: /
+    port: 8080
 ```
 
-*Note:* External traffic still connects to Service port `80`, but Kubernetes proxies it to container port `8080`.
+*Note:* External traffic still connects to Service port `80`, but Kubernetes proxies it to container port `8080`. If you completed the Health and scaling extension and defined a `startupProbe`, ensure its port is updated to `8080` as well (or remove it if unused); otherwise, the Pod will fail its startup probe on port 80 and the upgrade will time out.
 
 ### Step 2: Configure Pod and container security contexts
 
@@ -286,15 +291,15 @@ Add `# --` docstring comments above the parameters in `charts/nginx-demo/values.
 
 ```yaml
 # -- Number of replicas to deploy
-replicaCount: 1
+replicaCount: 2
 
 image:
   # -- Container image repository
   repository: nginxinc/nginx-unprivileged
+  # -- Container image tag
+  tag: "1.27-alpine"
   # -- Image pull policy
   pullPolicy: IfNotPresent
-  # -- Overrides the image tag whose default is the chart appVersion
-  tag: ""
 ```
 
 Run `helm-docs` using Docker (passing `--user` so generated files are owned by your current user):

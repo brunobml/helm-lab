@@ -8,11 +8,47 @@
 
 In Lab 5, you extracted reusable named templates into `_helpers.tpl`, implemented standard Kubernetes labels (`app.kubernetes.io/*`), and learned the critical architectural distinction between metadata labels and immutable selector labels.
 
-Below are in-depth explanations and answers for the questions posed in the **Explain** section.
+Below are in-depth explanations and answers for the questions posed in the **Check your understanding** section.
 
 ---
 
-### Question 1: Why are metadata labels and selector labels separate helpers?
+### Question 1: What is the difference between `define` and `include`?
+
+#### TL;DR
+
+- **`define`** declares and saves a named template into the template engine's global symbol table. It produces no direct output where it is declared.
+- **`include`** executes a named template and returns its rendered text output as a string, allowing you to pass the result into pipeline functions like `nindent` or `trimSuffix`.
+
+#### Deep Dive & Mechanism
+
+1. **Named Template Declaration (`define`):**
+
+   ```gotemplate
+   {{- define "nginx-demo.labels" -}}
+   app: {{ .Release.Name }}
+   app.kubernetes.io/name: nginx-demo
+   ...
+   {{- end -}}
+   ```
+
+   - Templates defined with `{{- define "name" -}}` are loaded into a flat, global symbol table shared across the root chart and all subcharts.
+   - **Why prefix helper names with `nginx-demo`:** Because the symbol table is global, if two charts both declare `{{- define "labels" -}}`, one will silently overwrite the other. Prefixing helper names with `<chart-name>.` (e.g. `nginx-demo.labels`, `nginx-demo.selectorLabels`) guarantees unique names across dependencies.
+
+2. **Executing Named Templates (`include` vs `template`):**
+   - Go's built-in `{{ template "name" . }}` is an action that writes output directly to the output stream. Crucially, **`template` cannot be pipelined** in Go templates.
+   - Helm provides `include` as a custom template function: `{{ include "name" . }}`.
+   - Because `include` is a function returning a string, its output can be piped into other functions:
+
+     ```gotemplate
+     labels:
+       {{- include "nginx-demo.labels" . | nindent 8 }}
+     ```
+
+   - This allows programmatic indentation (`nindent`), quote manipulation, or trimming.
+
+---
+
+### Question 2: Why do the Pods get five labels while the selectors use only one?
 
 #### TL;DR
 
@@ -33,56 +69,46 @@ Because **Deployment `spec.selector.matchLabels` is immutable in Kubernetes**, w
      - When you run `helm upgrade`, Kubernetes rejects the manifest because the selector cannot be mutated!
 2. **The Separation of Concerns:**
    - **`selectorLabels` (Minimal & Immutable):**
-     Contains only the absolute minimum labels needed to uniquely identify the workload:
+     Contains only the single label needed to route Service traffic and link Deployment Pods:
 
      ```yaml
-     app.kubernetes.io/name: nginx-demo
-     app.kubernetes.io/instance: demo-dev
-     # (or in our lab: app: demo-dev)
+     app: {{ .Release.Name }}
      ```
 
-     These never change over the entire lifetime of the release.
+     This never changes over the entire lifetime of the release.
    - **`labels` (Informational Metadata):**
-     Includes `selectorLabels` plus dynamic metadata:
+     Includes `selectorLabels` plus dynamic metadata (5 labels in total):
 
      ```yaml
-     app.kubernetes.io/version: "1.30.4"   # Changes with new versions
-     app.kubernetes.io/managed-by: Helm    # Identifies deployment tool
-     helm.sh/chart: nginx-demo-0.1.0       # Tracks specific chart packaging
+     app: {{ .Release.Name }}
+     app.kubernetes.io/name: nginx-demo
+     app.kubernetes.io/instance: {{ .Release.Name }}
+     app.kubernetes.io/version: {{ .Chart.AppVersion | quote }}
+     app.kubernetes.io/managed-by: {{ .Release.Service }}
      ```
 
-     These are placed on `metadata.labels` of the Deployment, Service, and Pods, where Kubernetes allows updates during rollouts.
+     These are placed on `metadata.labels` of the Deployment, Service, and Pod-template, where Kubernetes allows updates during rollouts without selector rejection.
 
 ---
 
-### Question 2: Why prefix helper names with `nginx-demo`?
+### Question 3: What does `nindent 8` do?
 
 #### TL;DR
 
-Named templates defined in `_helpers.tpl` share a single **global namespace** across the parent chart and all subcharts. Prefixing helper names with the chart name (`nginx-demo.labels`) prevents naming collisions.
+`nindent 8` writes a newline character (`\n`) and then indents every line of the piped string by exactly **8 spaces**.
 
 #### Deep Dive & Mechanism
 
-- In Helm, any template defined with `{{- define "helperName" -}}` is loaded into a flat, global symbol table.
-- If your chart defines:
-
-  ```gotemplate
-  {{- define "labels" -}} ... {{- end -}}
-  ```
-
-  And later in **Lab 8** you add a subchart (e.g., `lab-banner`, or Redis/PostgreSQL) that also defines `{{- define "labels" -}}`:
-  - One template will silently overwrite the other!
-  - Your parent chart might suddenly render labels meant for Redis, or vice-versa.
-- **The Helm Convention:**
-  Always namespace helper templates using `<chart-name>.<helperFunction>`:
-  - `nginx-demo.labels`
-  - `nginx-demo.selectorLabels`
-  - `nginx-demo.deploymentName`
-  - `nginx-demo.serviceName`
+- `indent N` adds $N$ spaces to every line, but leaves the very first line unindented unless preceded by a newline.
+- `nindent N` inserts a newline **first**, then indents every single line of the input text by $N$ spaces.
+- When paired with `{{-` (which strips all preceding whitespace and newlines from the template tag), `{{- include "..." . | nindent 8 }}` ensures:
+  1. The YAML key (e.g. `labels:`) remains cleanly on its own line.
+  2. The injected block starts immediately on the next line indented by exactly 8 spaces.
+  3. No empty blank lines or indentation misalignments are generated.
 
 ---
 
-### Question 3: Why could renaming resources turn a refactor into resource replacement?
+### Question 4: Why do we keep the same resource names during this change?
 
 #### TL;DR
 
@@ -111,8 +137,8 @@ Kubernetes resources are identified by their **`metadata.name`**. If you change 
 ## Break It and Recover — Detailed Walkthrough
 
 ### What the challenge asks
->
-> Temporarily put the version label in the selector helper and render. Compare with the installed Deployment's selector; do not apply it. Deployment selectors are immutable, and changing versions should not change which Pods are selected. Remove the version from selectors before continuing.
+
+> Temporarily add the version line to `nginx-demo.selectorLabels` and render. Compare with the live Deployment's selector. Observe that Kubernetes rejects changes to immutable selectors with `field is immutable` during a server-side dry run. Restore the original selector before continuing.
 
 #### 1. What to Break
 

@@ -1,24 +1,16 @@
 # Lab 16 review: Production hardening and chart best practices
 
-**Full re-run (third pass):** 2026-09-23 — every step re-executed end to end on a fresh kind cluster (Kubernetes v1.35.0), from an empty workspace, with k3d spot checks (Traefik Ingress, HPA). The items below were reproduced again unless marked otherwise.
+**Fourth pass:** 2026-09-23 against `cafc1b2`. Cleaned up first. Then every step was re-executed on a fresh kind cluster (Kubernetes v1.35.0, Helm v3.19.0) from an empty workspace, with code taken verbatim from the lab text, plus k3d spot checks. Items fixed in earlier passes are not repeated. The previous report version is in git history (`git log -p -- labs/reviews/`).
 
-**Re-validated:** 2026-09-23 against `44d3404` (Helm v3.19.0, helm-docs v1.14.2, kubeconform v0.6.7, kind v1.35.0). Re-run literally from the Lab 15 state.
+**Verified fixed:** The literal run passes: restricted Pod Security, PDB, NetworkPolicy, `helm test`, and the break-it and rollback. The `# --` instruction produces descriptions, the hardening test checkout gives **28/28** tests (42/42 with `shop`), and the `shop` dependency note works.
 
-**Fixed and verified:**
+## New bugs
 
-- **B1 / B2:** Step 2b renders the Pod and container security contexts and `containerPort: 8080`. The literal install into the `restricted` namespace now succeeds (2 Pods `1/1`, PDB, NetworkPolicy, `helm test` Succeeded). The break-it still produces `would violate PodSecurity` / `context deadline exceeded`, and the rollback recovers.
-- **B3:** The downstream-dependency note works. With `shop` still pinned at `0.5.0`, `helm dependency build charts/shop` fails. After changing it to `">=0.5.0 <=0.6.0"`, `helm dependency update charts/shop` succeeds and the umbrella renders 13 objects. On a fresh `main` worktree, `shop` builds, `helm unittest charts/nginx-demo charts/shop` passes 42/42, and `ct lint --all` passes.
-- **B4 (partly):** helm-docs with `--user` writes a file owned by the user, and both images are pinned.
-- **I2:** Resolved by the Lab 10 `hookLabels` change. The migration Pod no longer matches the PDB/NetworkPolicy selectors.
-- **I7:** "Two Pods, each `1/1 Running`". The lab now has Explain questions and a link.
+- **N1 (high): The helm-docs snippet breaks the chart if pasted.** It sets `image.tag: ""` and `replicaCount: 1`. Result: `[ERROR] values.yaml: - at '/image/tag': minLength: got 0, want 1`, and lint fails (verified). The comment "Overrides the image tag whose default is the chart appVersion" isn't true for this chart (the template uses `.Values.image.tag` directly), and `replicaCount: 1` silently changes the default from 2. Show only the comment lines added above the **existing** values.
+- **N2 (medium): `startupProbe` isn't moved to 8080.** The health extension now introduces `startupProbe`, but Lab 16 Step 1 only moves the liveness and readiness probes to 8080. With a startup probe still on port 80, the new Pod stays `0/1` and the upgrade times out (verified). Add `startupProbe` to Step 1.
 
-## Still open
+## Still open (minor)
 
-- **B4 (rest), medium:** The Description column is still **empty for every row** (for example `| replicaCount | int | \`2\` |  |`), because no step tells learners to add`# -- ...` comments to `values.yaml`. The new sentence explains the mechanism but gives nothing to do. Add a short step with 3–4`# --` examples.
-- **S2, medium:** The checkpoint says "including the hardening test suite in `tests/hardening_test.yaml`", but the lab never provides that file. A learner has only the Lab 12 suites (**20 tests**, re-verified). `main` has it (42 tests with `shop`). Include the file (or a short version) as a step.
-- **I1:** The NetworkPolicy ingress still allows every namespace (`namespaceSelector: {}`), so it isn't micro-segmentation.
-- **I3:** The image `1.27-alpine` doesn't match `appVersion: "1.30.4"` (`nginxinc/nginx-unprivileged:1.30-alpine` exists).
-- **I4:** `/var/run` isn't needed for nginx-unprivileged (its PID file is `/tmp/nginx.pid`).
-- **I5:** The test Pod uses `runAsUser: 1000` while `main` uses `101`.
-- **I6:** Step 6's `topologySpreadConstraints` snippet still doesn't say where it goes. (Step 2b places `securityContext` under `spec.template.spec`, so say "next to it".)
-- **I8:** kubeconform validates against 1.30.0. Match the cluster minor.
+- **I1:** The NetworkPolicy ingress still allows every namespace (`namespaceSelector: {}`).
+- **I3:** The `1.27-alpine` image doesn't match `appVersion: "1.30.4"` (`1.30-alpine` exists).
+- **I4, I5, I8** as before.

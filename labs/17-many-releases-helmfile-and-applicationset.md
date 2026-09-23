@@ -251,7 +251,7 @@ In Lab 13, database seeding was automated by the umbrella chart's migration hook
 
 ```bash
 # Initialize role, table, and data in the database:
-kubectl exec -n helm-lab-dev deploy/backend-db-db -- psql -U postgres -d postgres -c "
+kubectl exec -n helm-lab-dev statefulset/backend-db-db -- psql -U shop -d shop -c "
   DO \$\$
   BEGIN
     IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname = 'web_anon') THEN

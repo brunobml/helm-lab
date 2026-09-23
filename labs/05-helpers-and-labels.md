@@ -365,9 +365,9 @@ Try answering before opening the answers:
 
 ## Finish
 
-Save your working changes and observations. Mark Lab 5 complete in the README,
-commit your work, and create `lab-05-complete` if that checkpoint does not already
-exist. Keep `demo-dev` installed for Lab 6.
+Save your working changes and observations. Commit your work, and create
+`lab-05-complete` if that checkpoint does not already exist. Keep `demo-dev`
+installed for Lab 6.
 
 Optional reading: [Helm named templates](https://helm.sh/docs/v3/chart_template_guide/named_templates/)
 and [Kubernetes Deployment selectors](https://kubernetes.io/docs/concepts/workloads/controllers/deployment/#label-selector-updates).

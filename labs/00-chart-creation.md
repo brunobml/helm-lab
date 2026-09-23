@@ -1,6 +1,6 @@
 # Lab 0: Chart creation
 
-**Start:** An empty workspace, a practice branch, or a new worktree.
+**Start:** An empty directory, a practice branch (`git switch -c my-lab-00 lab-00-start`), or a clean worktree (`git worktree add ../helm-lab-practice lab-00-start`). *Do not run `helm create` directly on `main`*, as that would overwrite the reference chart.
 **Goal:** Scaffold a chart using `helm create`, examine the generated structure, strip unnecessary boilerplate, and craft a minimal working starter chart.
 
 ---

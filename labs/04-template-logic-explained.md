@@ -255,7 +255,7 @@ helm template demo-dev ./charts/nginx-demo -f ./charts/nginx-demo/values-dev.yam
 #### 3. The Error Observed
 
 ```text
-Error: YAML parse error on nginx-demo/templates/deployment.yaml: error converting YAML to JSON: yaml: line 28: mapping values are not allowed in this context
+Error: YAML parse error on nginx-demo/templates/deployment.yaml: error converting YAML to JSON: yaml: line 28: did not find expected '-' indicator
 ```
 
 #### 4. Why This Failed
@@ -269,7 +269,7 @@ Error: YAML parse error on nginx-demo/templates/deployment.yaml: error convertin
 
 Calculate the required indentation:
 
-- `spec:` (7 spaces or column 0)
+- `spec:` (0 spaces / column 0)
 - `template:` (2 spaces)
 - `spec:` (4 spaces)
 - `containers:` (6 spaces)
