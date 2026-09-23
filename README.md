@@ -88,6 +88,7 @@ If you already completed the original fundamentals, use Labs 0–3 as a short re
 - [ ] [15. CRDs and operators](labs/15-crds-and-operators.md) — the `crds/` directory, cert-manager, upgrade traps, and ordering
 - [ ] [16. Production hardening and chart best practices](labs/16-production-hardening-and-best-practices.md) — Pod Security restricted, PDB, NetworkPolicy, helm-docs, and kubeconform
 - [ ] [17. Many releases: Helmfile (and Argo CD ApplicationSet)](labs/17-many-releases-helmfile-and-applicationset.md) — Helmfile orchestration, environments, DAG dependencies, label filtering, and Argo CD ApplicationSet
+- [ ] [18. Helm internals and advanced operations](labs/18-helm-internals-and-advanced-operations.md) — release Secrets, 3-way merge patch, `--take-ownership`, deprecated APIs (`mapkubeapis`), and Helm 4 SSA
 
 Optional extensions after Lab 7:
 
@@ -122,6 +123,7 @@ This repository includes prebuilt, cluster-verified reference tags for every mil
 | `lab-15-complete` | Lab 15: CRD lifecycle (`charts/crd-demo`), `cert-manager` operator, silent drop trap, manual CRD upgrade playbook |
 | `lab-16-complete` | Lab 16: Production hardening (`nginx-demo` 0.6.0), Pod Security `restricted`, PDB, NetworkPolicy, `helm-docs`, `kubeconform` |
 | `lab-17-complete` | Lab 17: Many releases with Helmfile (`helmfile/`), DAG sequencing, environment promotion (`dev`/`prod`), and Argo CD ApplicationSet |
+| `lab-18-complete` | Lab 18: Helm internals, release Secrets, 3-way merge, resource adoption (`--take-ownership`), `mapkubeapis`, and Helm 4 SSA |
 | `extension-networking-complete` | Extension: Ingress and NodePort configuration |
 | `extension-health-complete` | Extension: Health probes and HorizontalPodAutoscaler (HPA v2) |
 | `extension-identity-complete` | Extension: ServiceAccount, RBAC Role/RoleBinding, and external Secrets |

@@ -15,7 +15,7 @@ executed on a real cluster before it is committed, and findings go into
 | Composition and delivery | 8-9: dependencies, packaging, OCI, GitOps | Can ship a chart |
 | Operating and hardening | 10-12: hooks and recovery, advanced templating and library charts, secrets/signing/CI | Can run charts in a team pipeline |
 | Integration | 13: capstone (done) | Can design and operate a multi-service release end to end |
-| Advanced track | 14-18 (below) | Can consume, harden, and evolve charts at scale |
+| Advanced track | 14-18 (done) | Can consume, harden, and evolve charts at scale |
 
 Kubernetes-focused extensions (networking, health and scaling, identity and secrets, storage)
 stay optional and are referenced by the labs that need them.
@@ -67,19 +67,17 @@ stay optional and are referenced by the labs that need them.
 - **Exercises:** Helmfile structure (`helmfile.yaml.gotmpl`, `environments/`, `values/`), layered values with Go templating (`.Values`), DAG topological installation (`backend-db` -> `backend-api` -> `frontend-web`), label filtering (`-l tier=backend`), environment promotion (`dev` to `prod` via version/scale bumps), and Argo CD `ApplicationSet` with the `List` generator.
 - **Traps it teaches:** the multi-document YAML syntax requirement in Helmfile v1, the `.gotmpl` extension requirement for dynamic Helmfile templates, the unpinned release drift trap, and circular DAG dependencies.
 
-## Advanced track (in progress)
+## Done: Lab 18, Helm internals and advanced operations
 
-Each lab below is independent of the others unless noted. Order is a recommendation, not a rule.
+**Goal:** understand Helm's internal machinery: release storage Secrets, the three-way strategic merge patch, resource adoption boundaries, deprecated Kubernetes API migrations with `mapkubeapis`, and architectural preparation for Helm 4's Server-Side Apply.
 
-### Lab 18: Helm internals and advanced operations
+- **Stack:** `charts/nginx-demo` and release storage Secrets (`type: helm.sh/release.v1`).
+- **Exercises:** decoding release Secrets by hand via double-base64 and gzip decompress (`jq` inspection of `.config`, `.manifest`, and `.info`), observing out-of-band annotation preservation and managed field drift reconciliation under the three-way strategic merge patch, reproducing resource collision errors and adopting unmanaged resources via `--take-ownership` and manual metadata injection (`meta.helm.sh/release-name`, `release-namespace`, `app.kubernetes.io/managed-by: Helm`), release history auditing with `--keep-history`, simulating the removed API upgrade deadlock (`policy/v1beta1`) and performing in-place release Secret migration via `helm-mapkubeapis`, recovering releases stuck in `pending-upgrade`, and analyzing Helm 4 Server-Side Apply (SSA) mechanics.
+- **Traps it teaches:** the removed API upgrade trap (discovery failure on Base manifest preventing upgrade even after updating chart templates), the unmanaged resource conflict error, and the `pending-upgrade` lock.
 
-**Why:** understanding the machinery is what turns guesses into diagnoses.
+## Advanced track (complete)
 
-- How release state is stored (Secrets, drivers); reading a revision by hand.
-- The three-way merge: manual `kubectl edit` drift and what `helm upgrade` does about it.
-- Adopting existing resources into a release (ownership annotations, `--take-ownership`), and `--keep-history`.
-- Deprecated API removal and migrating releases (`mapkubeapis`).
-- **Helm 3 versus Helm 4:** server-side apply, renamed flags (`--rollback-on-failure`), plugin changes; what to test before upgrading.
+All 18 core and advanced labs are complete and cluster-verified.
 
 ### Stretch (unscheduled)
 
