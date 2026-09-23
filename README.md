@@ -147,7 +147,7 @@ Work inside this repository without modifying `main` or losing reference solutio
    git checkout -b my-learning lab-00-start
    ```
 
-2. Follow the lab instructions in `labs/01-first-chart.md` through `labs/16-production-hardening-and-best-practices.md`.
+2. Follow the lab instructions in `labs/01-first-chart.md` through `labs/18-helm-internals-and-advanced-operations.md`.
 3. Test commands against your cluster and commit your progress as you complete each lab:
 
    ```bash
