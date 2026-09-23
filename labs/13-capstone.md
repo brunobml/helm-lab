@@ -1186,21 +1186,25 @@ kubectl get pvc -n helm-lab | grep shop-prod
 3. **Label collision.** In `charts/shop-api/templates/_helpers.tpl`, add `app: {{ .Release.Name }}` to `shop-api.selectorLabels`, then run
    `helm dependency build charts/shop && helm unittest charts/shop`. *Expect:* the test `api and db pods do not carry the web selector label` fails.
    To see the real harm, install a fresh release with the change (an existing release would fail earlier on Kubernetes' immutable selectors):
+
    ```bash
    helm dependency build charts/shop
    helm secrets install shop-bad ./charts/shop -n helm-lab -f ./charts/shop/values-dev.yaml -f ./charts/shop/secrets.dev.yaml --wait --timeout 150s
    kubectl get endpointslices -n helm-lab -l kubernetes.io/service-name=shop-bad-service -o jsonpath='{.items[*].endpoints[*].addresses}{"\n"}'
    for i in 1 2 3 4 5 6; do kubectl run c$i --rm -i --restart=Never --image=busybox:1.36 -n helm-lab -q -- wget -qO- --timeout=3 http://shop-bad-service/; done
    ```
+
    *Expect:* `helm install --wait` still succeeds, the Service lists **two** addresses (the web pod and the API pod), and some requests print
    `<h1>Shop (dev)</h1>` while others fail with `can't connect to remote host` (nothing listens on port 80 in the API pod). Nothing in the release
    is "unhealthy"; only traffic is wrong. Uninstall `shop-bad`, revert the change, and rebuild the dependencies.
 4. **Build in the wrong order (fresh clone).** Remove the inner archives and rebuild only the outer chart:
+
    ```bash
    rm charts/nginx-demo/charts/*.tgz charts/shop/charts/*.tgz
    helm dependency build charts/shop
    helm template s charts/shop --set credentials.dbPassword=x
    ```
+
    *Expect:* the build says it succeeded, but the render fails with `no template "lab-common.labels" associated with template "gotpl"`.
    The message names a symptom, not the cause: `nginx-demo`'s own dependencies were never built. Run `helm dependency build charts/nginx-demo` first.
 5. **A migration that is not idempotent.** Change `CREATE TABLE IF NOT EXISTS` to `CREATE TABLE` in `migration-job.yaml` and run `U --atomic --timeout 90s`.
@@ -1242,4 +1246,3 @@ References: [PostgREST](https://postgrest.org/en/v12/), [Helm subcharts and glob
 ## Your notes
 
 Record versions, observations, failures, and explanations here.
-

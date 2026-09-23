@@ -23,15 +23,21 @@ Create an ingress values file with a host and path, render with it, and inspect
 the backend. Disabled output has no Ingress; enabled output has the expected
 host, pathType, class, and backend port.
 
-After deploying your values:
+After deploying your values (using your cluster's IngressClass, e.g. `traefik` for k3d/k3s or `nginx` for kind):
+
 ```bash
-helm upgrade demo-dev ./charts/nginx-demo -n helm-lab --set ingress.enabled=true --set ingress.className=traefik --wait --timeout 120s
+helm upgrade demo-dev ./charts/nginx-demo -n helm-lab --set ingress.enabled=true --set ingress.className=nginx --wait --timeout 120s
 kubectl get ingress -n helm-lab
 ```
 
-Test routing through the Ingress controller using an ephemeral curl Pod (works in any local cluster):
+Test routing through the Ingress controller using an ephemeral curl Pod (adjust the controller Service DNS for your cluster):
+
 ```bash
-kubectl run curl-test --image=curlimages/curl:8.5.0 --rm -i --restart=Never -- -s -H "Host: chart-example.local" http://traefik.kube-system.svc.cluster.local/
+# For ingress-nginx:
+kubectl run curl-test --image=curlimages/curl:8.5.0 --rm -i --restart=Never -- -s -H "Host: chart-example.local" http://ingress-nginx-controller.ingress-nginx.svc.cluster.local/
+
+# For k3s/k3d Traefik:
+# kubectl run curl-test --image=curlimages/curl:8.5.0 --rm -i --restart=Never -- -s -H "Host: chart-example.local" http://traefik.kube-system.svc.cluster.local/
 ```
 
 ## Break it and recover
