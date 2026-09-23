@@ -1,6 +1,6 @@
 # Lab 0: Chart creation
 
-**Start:** An empty directory, a practice branch (`git switch -c my-lab-00 lab-00-start`), or a clean worktree (`git worktree add ../helm-lab-practice lab-00-start`). *Do not run `helm create` directly on `main`*, as that would overwrite the reference chart.
+**Start:** An empty directory, a practice branch (`git switch -c my-lab-00 lab-00-start`), or a clean worktree (`git worktree add ../helm-lab-practice lab-00-start`). *Do not run `helm create` directly on `main`*, as that would overwrite the reference chart. The `lab-00-start` tag already contains this lab's result, so when you start from it, Step 1 prints `WARNING: File ... already exists. Overwriting.` for a few files; that is expected, and Steps 3–6 replace them.
 **Goal:** Scaffold a chart using `helm create`, examine the generated structure, strip unnecessary boilerplate, and craft a minimal working starter chart.
 
 ---
@@ -123,6 +123,7 @@ spec:
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
           imagePullPolicy: {{ .Values.image.pullPolicy }}
           ports:
+            # Declares the image's default port; it does not configure the server.
             - containerPort: 80
 ```
 
@@ -169,8 +170,15 @@ Run `helm lint ./charts/nginx-demo` and observe:
 ```text
 ==> Linting ./charts/nginx-demo
 [ERROR] Chart.yaml: version 'latest' is not a valid SemVer
+[INFO] Chart.yaml: icon is recommended
+[ERROR] templates/: validation: chart.metadata.version "latest" is invalid
+[ERROR] : unable to load chart
+    validation: chart.metadata.version "latest" is invalid
+
 Error: 1 chart(s) linted, 1 chart(s) failed
 ```
+
+The first line is the SemVer check; the others follow because Helm cannot load a chart with an invalid version.
 
 *Note on YAML typing:* If you try unquoted `version: 1`, Helm fails with a YAML type error (`version should be of type string but it's of type float64`). Quoted `"1"` is coerced by Helm's SemVer parser to `1.0.0`, which is why non-numeric strings like `latest` or malformed numbers like `1.0.0.1` explicitly test SemVer validation.
 

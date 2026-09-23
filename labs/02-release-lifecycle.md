@@ -46,8 +46,8 @@ helm history demo-dev -n helm-lab
 
 Expect the upgrade to time out and a new Pod to report an image-pull error.
 Existing healthy Pods may continue serving traffic. Recover by rolling back to
-the last successful revision shown in history, using the rollback command above
-with that revision number. Verify the Deployment is healthy again.
+the newest revision whose STATUS is `deployed` in `helm history` (revision 3 if you
+followed this lab): `helm rollback demo-dev 3 -n helm-lab --wait --timeout 120s`. Verify the Deployment is healthy again.
 
 ## Explain
 
@@ -69,6 +69,7 @@ helm install demo-dev ./charts/nginx-demo -n helm-lab --wait --timeout 120s
 ```
 
 The namespace remains; the fresh install starts new release history. Record
-observations, commit, and create `lab-02-complete`.
+observations, commit, and create a personal tag such as `my-lab-02-complete` (the reference
+`lab-02-complete` tag already exists in this repository).
 
 Next: [Values and environments](03-values-and-environments.md).

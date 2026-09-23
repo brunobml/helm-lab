@@ -5,7 +5,7 @@ image:
   # -- Image repository (unprivileged nginx to allow rootless operation)
   repository: nginxinc/nginx-unprivileged
   # -- Explicit application version; use a digest for immutable image identity.
-  tag: "1.27-alpine"
+  tag: "1.30-alpine"
   # -- Image pull policy
   pullPolicy: IfNotPresent
 
@@ -53,6 +53,8 @@ podDisruptionBudget:
 # -- NetworkPolicy configuration for network micro-segmentation.
 networkPolicy:
   enabled: false
+  # -- Extra namespaces allowed to reach the Pods (for example `traefik` on kind, or `kube-system` for k3d's bundled Traefik). The release namespace is always allowed.
+  allowedNamespaces: []
 
 # -- Topology spread constraints to distribute Pods across zones/nodes.
 topologySpreadConstraints: []
@@ -104,6 +106,8 @@ serviceAccount:
   create: true
   name: ""
   annotations: {}
+  # -- Mount an API token into Pods using this ServiceAccount. NGINX doesn't need one.
+  automountToken: false
 
 rbac:
   create: false

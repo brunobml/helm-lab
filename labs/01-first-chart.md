@@ -23,15 +23,20 @@ helm install demo-dev ./charts/nginx-demo -n helm-lab --create-namespace --wait 
 helm list -n helm-lab
 kubectl get deployment,pods,service -n helm-lab
 kubectl rollout status deployment/demo-dev-deployment -n helm-lab --timeout=120s
-kubectl port-forward -n helm-lab service/demo-dev-service 8080:80
 ```
 
 Expect a deployed Helm release, a Deployment with two ready replicas, and a
-ClusterIP Service. Leave port-forward running; in another terminal:
+ClusterIP Service. Then open a temporary tunnel to the Service and request the page.
+`port-forward` keeps running until stopped, so start it in the background:
 
 ```bash
+kubectl port-forward -n helm-lab service/demo-dev-service 8080:80 &
+sleep 2
 curl --fail http://localhost:8080
+kill %1   # stop the port-forward
 ```
+
+(Alternatively, run `port-forward` in one terminal and `curl` in another.)
 
 Expect the NGINX welcome HTML. Rendering alone cannot prove that HTTP works.
 
@@ -53,8 +58,9 @@ Do not deploy this broken version; later you will add input validation.
 
 ## Cleanup and checkpoint
 
-Stop port-forwarding with Ctrl+C. Keep `demo-dev` installed for Lab 2. Record
-your observations, commit your work, and create `lab-01-complete`.
+Make sure port-forwarding is stopped (`kill %1`, or Ctrl+C in its terminal). Keep `demo-dev` installed for Lab 2. Record
+your observations, commit your work, and create a personal tag such as `my-lab-01-complete` (the reference
+`lab-01-complete` tag already exists in this repository).
 
 <details>
 <summary>Hint</summary>

@@ -17,8 +17,8 @@ Four parts, each usable on its own:
 Plugins (work on every platform):
 
 ```bash
-helm plugin install https://github.com/helm-unittest/helm-unittest
-helm plugin install https://github.com/jkroepke/helm-secrets
+helm plugin install https://github.com/helm-unittest/helm-unittest --version v1.1.2
+helm plugin install https://github.com/jkroepke/helm-secrets --version v4.7.8
 ```
 
 Binaries. On macOS: `brew install sops age cosign chart-testing yamllint`. On Linux (amd64),
@@ -38,6 +38,13 @@ sops --version; age --version; cosign version | grep GitVersion; ct version | he
 
 Also `gpg` (usually preinstalled) for Part C. Newer versions of these tools should work;
 the ones above are what this lab was verified with.
+
+Create a scratch directory for this lab's packages and keys, and remember the repository root
+(run the rest of the lab from the same shell, or re-run this line in a new one):
+
+```bash
+LAB_REPO=$(pwd); LAB_TMP=$(mktemp -d)
+```
 
 ---
 
@@ -284,7 +291,7 @@ Append to `charts/nginx-demo/.helmignore`:
 > The leading `/` matters. A bare `tests/` matches a directory named `tests` at **any depth**, including
 > `templates/tests/`, and would silently drop your Lab 7 `helm test` hook, from renders, installs and packages alike.
 > Check with `helm template d ./charts/nginx-demo | grep -c http-test` (expect `1`) and
-> `helm package ./charts/nginx-demo -d /tmp/pk && tar tzf /tmp/pk/nginx-demo-*.tgz | grep templates/tests`.
+> `helm package ./charts/nginx-demo -d $LAB_TMP/pk && tar tzf $LAB_TMP/pk/nginx-demo-*.tgz | grep templates/tests`.
 
 ### Step 10: Write the first suites
 
@@ -570,8 +577,9 @@ export GNUPGHOME=$(mktemp -d); chmod 700 "$GNUPGHOME"
 gpg --batch --pinentry-mode loopback --passphrase '' \
   --quick-generate-key "Helm Lab <helm-lab@example.com>" rsa3072 default 1y
 # Helm 3 reads the legacy keyring format:
-gpg --export > "$GNUPGHOME/pubring.gpg"
-gpg --batch --pinentry-mode loopback --passphrase '' --export-secret-keys > "$GNUPGHOME/secring.gpg"
+mkdir -p "$GNUPGHOME/helm-keys"   # a subdirectory: legacy keyrings in the GnuPG home root trigger a "migration"
+gpg --export > "$GNUPGHOME/helm-keys/pubring.gpg"
+gpg --batch --pinentry-mode loopback --passphrase '' --export-secret-keys > "$GNUPGHOME/helm-keys/secring.gpg"
 ```
 
 > [!NOTE]
@@ -580,10 +588,10 @@ gpg --batch --pinentry-mode loopback --passphrase '' --export-secret-keys > "$GN
 ### Step 13: Package with a signature and verify it
 
 ```bash
-mkdir -p /tmp/signed
-helm package ./charts/nginx-demo --sign --key "Helm Lab" --keyring "$GNUPGHOME/secring.gpg" -d /tmp/signed
-ls /tmp/signed        # nginx-demo-0.5.0.tgz  nginx-demo-0.5.0.tgz.prov
-helm verify /tmp/signed/nginx-demo-0.5.0.tgz --keyring "$GNUPGHOME/pubring.gpg"
+mkdir -p $LAB_TMP/signed
+helm package ./charts/nginx-demo --sign --key "Helm Lab" --keyring "$GNUPGHOME/helm-keys/secring.gpg" -d $LAB_TMP/signed
+ls $LAB_TMP/signed        # nginx-demo-0.5.0.tgz  nginx-demo-0.5.0.tgz.prov
+helm verify $LAB_TMP/signed/nginx-demo-0.5.0.tgz --keyring "$GNUPGHOME/helm-keys/pubring.gpg"
 ```
 
 *Expect:* `Signed by: Helm Lab <helm-lab@example.com>` and `Chart Hash Verified: sha256:...`.
@@ -591,21 +599,21 @@ helm verify /tmp/signed/nginx-demo-0.5.0.tgz --keyring "$GNUPGHOME/pubring.gpg"
 Install refusing anything unverified:
 
 ```bash
-helm install demo-signed /tmp/signed/nginx-demo-0.5.0.tgz -n helm-lab --verify \
-  --keyring "$GNUPGHOME/pubring.gpg" -f ./charts/nginx-demo/values-dev.yaml --wait --timeout 90s
+helm install demo-signed $LAB_TMP/signed/nginx-demo-0.5.0.tgz -n helm-lab --verify \
+  --keyring "$GNUPGHOME/helm-keys/pubring.gpg" -f ./charts/nginx-demo/values-dev.yaml --wait --timeout 90s
 helm uninstall demo-signed -n helm-lab
 ```
 
 ### Step 14: Tamper with it
 
 ```bash
-rm -rf /tmp/tampered && mkdir -p /tmp/tampered/x && cp /tmp/signed/* /tmp/tampered/
-tar xzf /tmp/tampered/nginx-demo-0.5.0.tgz -C /tmp/tampered/x
-echo "# evil" >> /tmp/tampered/x/nginx-demo/values.yaml
-tar czf /tmp/tampered/nginx-demo-0.5.0.tgz -C /tmp/tampered/x nginx-demo
+rm -rf $LAB_TMP/tampered && mkdir -p $LAB_TMP/tampered/x && cp $LAB_TMP/signed/* $LAB_TMP/tampered/
+tar xzf $LAB_TMP/tampered/nginx-demo-0.5.0.tgz -C $LAB_TMP/tampered/x
+echo "# evil" >> $LAB_TMP/tampered/x/nginx-demo/values.yaml
+tar czf $LAB_TMP/tampered/nginx-demo-0.5.0.tgz -C $LAB_TMP/tampered/x nginx-demo
 
-helm verify /tmp/tampered/nginx-demo-0.5.0.tgz --keyring "$GNUPGHOME/pubring.gpg"
-helm verify /tmp/signed/nginx-demo-0.5.0.tgz --keyring /dev/null
+helm verify $LAB_TMP/tampered/nginx-demo-0.5.0.tgz --keyring "$GNUPGHOME/helm-keys/pubring.gpg"
+helm verify $LAB_TMP/signed/nginx-demo-0.5.0.tgz --keyring /dev/null
 ```
 
 *Expect:* `sha256 sum does not match ...` for the modified archive, and `signature made by unknown entity`
@@ -615,16 +623,16 @@ when the verifier does not trust the signer. **Both** matter: a valid hash prove
 
 ```bash
 docker start helm-registry 2>/dev/null || docker run -d -p 5001:5000 --name helm-registry registry:2
-helm push /tmp/signed/nginx-demo-0.5.0.tgz oci://localhost:5001/helm-lab
+helm push $LAB_TMP/signed/nginx-demo-0.5.0.tgz oci://localhost:5001/helm-lab
 ```
 
 *Expect:* `Pushed: localhost:5001/helm-lab/nginx-demo:0.5.0` and a `Digest: sha256:...`. Copy that digest.
 
 ```bash
-mkdir -p /tmp/pull
+mkdir -p $LAB_TMP/pull
 helm pull oci://localhost:5001/helm-lab/nginx-demo --version 0.5.0 --verify \
-  --keyring "$GNUPGHOME/pubring.gpg" -d /tmp/pull
-ls /tmp/pull          # .tgz and .prov both came from the registry
+  --keyring "$GNUPGHOME/helm-keys/pubring.gpg" -d $LAB_TMP/pull
+ls $LAB_TMP/pull          # .tgz and .prov both came from the registry
 ```
 
 `helm push` uploads the `.prov` next to the chart when it exists.
@@ -635,13 +643,13 @@ Helm provenance signs the *archive*. `cosign` signs the *registry object by dige
 container images are signed, so one policy engine (Kyverno, Sigstore policy-controller) can enforce both.
 
 ```bash
-cd /tmp && COSIGN_PASSWORD="" cosign generate-key-pair
+cd "$LAB_TMP" && COSIGN_PASSWORD="" cosign generate-key-pair
 DIGEST=sha256:<paste the digest from helm push>
 
-COSIGN_PASSWORD="" cosign sign --key /tmp/cosign.key --yes --allow-insecure-registry \
+COSIGN_PASSWORD="" cosign sign --key $LAB_TMP/cosign.key --yes --allow-insecure-registry \
   --use-signing-config=false --tlog-upload=false localhost:5001/helm-lab/nginx-demo@$DIGEST
 
-cosign verify --key /tmp/cosign.pub --allow-insecure-registry --insecure-ignore-tlog=true \
+cosign verify --key $LAB_TMP/cosign.pub --allow-insecure-registry --insecure-ignore-tlog=true \
   localhost:5001/helm-lab/nginx-demo@$DIGEST
 ```
 
@@ -655,8 +663,8 @@ cosign verify --key /tmp/cosign.pub --allow-insecure-registry --insecure-ignore-
 Prove it rejects the wrong key, and unsigned artifacts:
 
 ```bash
-cd /tmp && COSIGN_PASSWORD="" cosign generate-key-pair --output-key-prefix other
-cosign verify --key /tmp/other.pub --allow-insecure-registry --insecure-ignore-tlog=true \
+cd "$LAB_TMP" && COSIGN_PASSWORD="" cosign generate-key-pair --output-key-prefix other
+cosign verify --key $LAB_TMP/other.pub --allow-insecure-registry --insecure-ignore-tlog=true \
   localhost:5001/helm-lab/nginx-demo@$DIGEST
 ```
 
@@ -836,7 +844,7 @@ jobs:
 
       - name: Unit tests
         run: |
-          helm plugin install https://github.com/helm-unittest/helm-unittest
+          helm plugin install https://github.com/helm-unittest/helm-unittest --version v1.1.2
           helm unittest charts/nginx-demo
 
       - name: Lint
@@ -878,8 +886,8 @@ helm dependency build ./charts/nginx-demo
 helm lint ./charts/nginx-demo
 helm unittest ./charts/nginx-demo
 ct lint --config ct.yaml --all
-helm package ./charts/nginx-demo -d /tmp/pk-check && tar tzf /tmp/pk-check/nginx-demo-*.tgz | grep -E "secrets\.|\.sops|nginx-demo/tests/|nginx-demo/ci/"   # no output
-tar tzf /tmp/pk-check/nginx-demo-*.tgz | grep templates/tests/http.yaml                                                 # still present
+helm package ./charts/nginx-demo -d $LAB_TMP/pk-check && tar tzf $LAB_TMP/pk-check/nginx-demo-*.tgz | grep -E "secrets\.|\.sops|nginx-demo/tests/|nginx-demo/ci/"   # no output
+tar tzf $LAB_TMP/pk-check/nginx-demo-*.tgz | grep templates/tests/http.yaml                                                 # still present
 ```
 
 Cluster:
@@ -933,13 +941,14 @@ ct install --config ct.yaml --charts charts/nginx-demo
 ```bash
 helm uninstall demo-secret -n helm-lab
 docker rm -f helm-registry 2>/dev/null || true
-rm -rf /tmp/signed /tmp/tampered /tmp/pull /tmp/pk /tmp/pk-check /tmp/cosign.* /tmp/other.* "$GNUPGHOME"
+cd "$LAB_REPO" && rm -rf "$LAB_TMP" "$GNUPGHOME"
 unset GNUPGHOME
 ```
 
 Keep `~/.config/sops/age/keys.txt` (you need it to decrypt `secrets.dev.yaml`). You can commit
 `charts/nginx-demo/secrets.dev.yaml` and `.sops.yaml`; they contain no plaintext. Do **not** commit `keys.txt`, any `*.dec` file,
-or the GnuPG directory. Tick Lab 12 in the README and create `lab-12-complete`.
+or the GnuPG directory. Create a personal tag such as `my-lab-12-complete` (the reference
+`lab-12-complete` tag already exists in this repository).
 
 References: [SOPS](https://github.com/getsops/sops), [age](https://github.com/FiloSottile/age),
 [helm-secrets](https://github.com/jkroepke/helm-secrets), [helm-unittest](https://github.com/helm-unittest/helm-unittest),

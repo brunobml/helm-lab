@@ -25,7 +25,7 @@ A small NGINX application for the Helm Lab exercises
 | global.environment | string | `"local"` |  |
 | image.pullPolicy | string | `"IfNotPresent"` | Image pull policy |
 | image.repository | string | `"nginxinc/nginx-unprivileged"` | Image repository (unprivileged nginx to allow rootless operation) |
-| image.tag | string | `"1.27-alpine"` | Explicit application version; use a digest for immutable image identity. |
+| image.tag | string | `"1.30-alpine"` | Explicit application version; use a digest for immutable image identity. |
 | ingress.annotations | object | `{}` |  |
 | ingress.className | string | `""` |  |
 | ingress.enabled | bool | `false` |  |
@@ -37,7 +37,8 @@ A small NGINX application for the Helm Lab exercises
 | lab-banner.message | string | `"Hello from the parent"` |  |
 | livenessProbe | object | `{"httpGet":{"path":"/","port":8080}}` | Liveness probe configuration. |
 | migration | object | `{"enabled":true,"fail":false,"image":"busybox:1.36"}` | Pre-install/pre-upgrade hook Job that simulates a database migration. |
-| networkPolicy | object | `{"enabled":false}` | NetworkPolicy configuration for network micro-segmentation. |
+| networkPolicy | object | `{"allowedNamespaces":[],"enabled":false}` | NetworkPolicy configuration for network micro-segmentation. |
+| networkPolicy.allowedNamespaces | list | `[]` | Extra namespaces allowed to reach the Pods (for example `traefik` on kind, or `kube-system` for k3d's bundled Traefik). The release namespace is always allowed. |
 | pageContent | string | `"<h1>Hello from Helm Lab</h1>\n"` | Custom HTML content for the demo index page. |
 | podDisruptionBudget | object | `{"enabled":false,"minAvailable":1}` | PodDisruptionBudget configuration for high availability during node maintenance. |
 | podSecurityContext | object | `{"runAsNonRoot":true,"seccompProfile":{"type":"RuntimeDefault"}}` | Pod-level security context configuration for Pod Security restricted profile. |
@@ -51,8 +52,10 @@ A small NGINX application for the Helm Lab exercises
 | service.targetPort | int | `8080` | Target port container listens on (unprivileged nginx defaults to 8080) |
 | service.type | string | `"ClusterIP"` | Kubernetes Service type (ClusterIP, NodePort, LoadBalancer) |
 | serviceAccount.annotations | object | `{}` |  |
+| serviceAccount.automountToken | bool | `false` | Mount an API token into Pods using this ServiceAccount. NGINX doesn't need one. |
 | serviceAccount.create | bool | `true` |  |
 | serviceAccount.name | string | `""` |  |
+| startupProbe | object | `{}` | Startup probe configuration. |
 | topologySpreadConstraints | list | `[]` | Topology spread constraints to distribute Pods across zones/nodes. |
 
 ----------------------------------------------

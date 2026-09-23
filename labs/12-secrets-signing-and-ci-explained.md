@@ -172,8 +172,8 @@ Remove `/secrets.*.yaml` and `/.sops.yaml` from `charts/nginx-demo/.helmignore`:
 
 ```bash
 sed -i '/\/secrets\.\*\.yaml/d' charts/nginx-demo/.helmignore && sed -i '/\/\.sops\.yaml/d' charts/nginx-demo/.helmignore
-helm package ./charts/nginx-demo -d /tmp/pk-test
-tar tzf /tmp/pk-test/nginx-demo-*.tgz | grep -E "secrets\.|\.sops"
+helm package ./charts/nginx-demo -d $LAB_TMP/pk-test
+tar tzf $LAB_TMP/pk-test/nginx-demo-*.tgz | grep -E "secrets\.|\.sops"
 ```
 
 #### 2. The Error Observed
@@ -200,8 +200,8 @@ Restore the ignore rules in `.helmignore`:
 Verify the packaged archive:
 
 ```bash
-helm package ./charts/nginx-demo -d /tmp/pk-check
-tar tzf /tmp/pk-check/nginx-demo-*.tgz | grep -E "secrets\.|\.sops"  # No output
+helm package ./charts/nginx-demo -d $LAB_TMP/pk-check
+tar tzf $LAB_TMP/pk-check/nginx-demo-*.tgz | grep -E "secrets\.|\.sops"  # No output
 ```
 
 ---

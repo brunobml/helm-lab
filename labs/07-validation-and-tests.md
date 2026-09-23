@@ -13,7 +13,7 @@ Add the schema definition:
 
 ```json
 {
-  "$schema": "https://json-schema.org/draft-07/schema#",
+  "$schema": "http://json-schema.org/draft-07/schema#",
   "title": "Values",
   "type": "object",
   "required": [
@@ -236,7 +236,8 @@ helm status demo-dev -n helm-lab
 ## Cleanup and checkpoint
 
 Keep the corrected test and schema. Remove any retained failed test Pod after
-inspection. Commit and create `lab-07-complete`.
+inspection. Commit and create a personal tag such as `my-lab-07-complete` (the reference
+`lab-07-complete` tag already exists in this repository).
 
 Reference: [Chart tests](https://helm.sh/docs/v3/topics/chart_tests/).
 

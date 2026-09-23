@@ -32,7 +32,8 @@ files. Inspect the cluster:
 ```bash
 helm list -n helm-lab
 kubectl get deployments -n helm-lab
-kubectl get service demo-dev-service demo-prod-service -n helm-lab -o yaml
+kubectl get service demo-dev-service demo-prod-service -n helm-lab \
+  -o custom-columns=NAME:.metadata.name,SELECTOR:.spec.selector
 ```
 
 Expect separate Deployments with one and three replicas. Each Service selects
@@ -61,7 +62,7 @@ value changes NGINX's configuration. Keep targetPort at 80.
 helm uninstall demo-prod -n helm-lab
 ```
 
-Keep both values files and `demo-dev` with one replica. Commit and create
-`lab-03-complete`.
+Keep both values files and `demo-dev` with one replica. Commit and create a personal tag such as `my-lab-03-complete` (the reference
+`lab-03-complete` tag already exists in this repository).
 
 Next: [Template logic](04-template-logic.md).

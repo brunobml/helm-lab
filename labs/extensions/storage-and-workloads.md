@@ -1,6 +1,6 @@
 # Extension: Storage and other workloads
 
-**Start:** Lab 7 or later; a local cluster with a working storage provisioner.
+**Start:** Lab 7 or later (do all four extensions before Lab 10; later labs build on them); a local cluster with a working storage provisioner.
 **Goal:** Learn when a different workload deserves its own chart.
 
 ## Steps
@@ -81,8 +81,23 @@ reclaim policy affect cleanup? Why is a StatefulSet more than a Deployment with 
 
 ## Cleanup and checkpoint
 
-Uninstall `storage-demo`, inspect remaining PVCs/PVs, and remove only disposable
-exercise storage. Save `extension-storage-complete`.
+Uninstall `storage-demo`, then inspect what survives:
+
+```bash
+helm uninstall storage-demo -n helm-lab
+kubectl get pvc,pv -n helm-lab
+```
+
+The chart's own `storage-demo-data` PVC is deleted with the release (unless you added
+`helm.sh/resource-policy: keep`). If you tried the Step 4 StatefulSet, its
+`stateful-data-storage-demo-stateful-0` PVC **remains**: Kubernetes never deletes
+`volumeClaimTemplates` PVCs when the StatefulSet goes away. Remove it only when the data is disposable:
+
+```bash
+kubectl delete pvc stateful-data-storage-demo-stateful-0 -n helm-lab
+```
+
+Save `extension-storage-complete`.
 
 <details>
 <summary>Hint: charts/storage-demo/values.yaml and Chart.yaml</summary>
@@ -221,6 +236,20 @@ spec:
               image: busybox:1.36
               command: ["sh", "-c", "echo 'Backup task finished'"]
 
+---
+# Headless Service: gives each StatefulSet Pod a stable DNS name
+# (<release>-stateful-0.<release>-headless.<namespace>.svc.cluster.local).
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Release.Name }}-headless
+spec:
+  clusterIP: None
+  selector:
+    app: {{ .Release.Name }}-stateful
+  ports:
+    - name: placeholder
+      port: 80
 ---
 # StatefulSet pattern (dedicated per-Pod PVCs via volumeClaimTemplates):
 apiVersion: apps/v1

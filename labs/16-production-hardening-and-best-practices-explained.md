@@ -98,6 +98,7 @@ When a `NetworkPolicy` selects a pod:
 1. **Default Deny:** The pod enters an "isolated" state. All ingress traffic is denied except what is explicitly whitelisted.
 2. **DNS Egress Requirement:**
    If a NetworkPolicy specifies `policyTypes: [Egress]`, **all egress is blocked**. If you do not explicitly whitelist UDP/TCP port 53 to the cluster DNS service (CoreDNS in `kube-system`), the application will fail to resolve any domain names, databases, or external APIs!
+3. **Selector semantics in `from`:** Each list item is a separate allowed source. `podSelector: {}` on its own means "any Pod in **this** namespace". `namespaceSelector: {}` on its own means "any Pod in **any** namespace", which effectively disables ingress isolation. That's why the chart allows the release namespace plus only the namespaces listed in `networkPolicy.allowedNamespaces`, matched by the built-in `kubernetes.io/metadata.name` label. If you put an Ingress controller in front of the chart, add its namespace to that list.
 
 ---
 

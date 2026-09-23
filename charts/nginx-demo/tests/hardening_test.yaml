@@ -96,6 +96,24 @@ tests:
       - equal:
           path: spec.egress[0].ports[0].port
           value: 53
+      - equal:
+          path: spec.ingress[0].from
+          value:
+            - podSelector: {}
+
+  - it: allows only explicitly listed extra namespaces
+    template: templates/networkpolicy.yaml
+    set:
+      networkPolicy.enabled: true
+      networkPolicy.allowedNamespaces:
+        - traefik
+    asserts:
+      - equal:
+          path: spec.ingress[0].from[1].namespaceSelector.matchLabels["kubernetes.io/metadata.name"]
+          value: traefik
+      - lengthEqual:
+          path: spec.ingress[0].from
+          count: 2
 
   - it: does not render NetworkPolicy by default
     template: templates/networkpolicy.yaml

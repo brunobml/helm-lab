@@ -1,6 +1,7 @@
 # Lab 10: Hooks, failure recovery, and debugging
 
-**Start:** Lab 9 complete (`lab-09-complete`). Use the `helm-lab` namespace on your disposable cluster.
+**Start:** Lab 9 and the four extensions complete (reference state: tag `extension-storage-complete`). Use the `helm-lab` namespace on your disposable cluster.
+Labs 10–18 build on the probes, autoscaling, ServiceAccount, and `existingSecret` features the extensions add.
 **Goal:** Run a task before an upgrade, survive a failed upgrade, and diagnose problems before and after they reach the cluster.
 
 You have used one hook so far: the `test` Pod from Lab 7. Real charts use hooks
@@ -240,7 +241,7 @@ helm template demo-hooks ./charts/nginx-demo -n helm-lab \
 helm plugin list
 
 # If diff is not listed, install it:
-helm plugin install https://github.com/databus23/helm-diff
+helm plugin install https://github.com/databus23/helm-diff --version v3.15.13
 ```
 
 ```bash
@@ -248,8 +249,17 @@ helm diff upgrade demo-hooks ./charts/nginx-demo -n helm-lab \
   -f ./charts/nginx-demo/values-dev.yaml --set replicaCount=3
 ```
 
-*Expect:* a colored diff showing `-   replicas: 2` and `+   replicas: 3` and nothing
-else. Use `helm diff` in reviews and CI before every upgrade.
+*Expect:* a colored diff showing `-   replicas: 2` and `+   replicas: 3` on the Deployment,
+**plus** a change on the `demo-hooks-migrate` Job: its script echoes `.Release.Revision`, and
+helm-diff renders the new manifest as revision 1. Anything built from `.Release.Revision`,
+`now`, or random functions shows up in every diff. To review only regular resources, skip hooks:
+
+```bash
+helm diff upgrade demo-hooks ./charts/nginx-demo -n helm-lab --no-hooks \
+  -f ./charts/nginx-demo/values-dev.yaml --set replicaCount=3
+```
+
+*Expect:* only the `replicas` change. Use `helm diff` in reviews and CI before every upgrade.
 
 ### 4. What is actually deployed? (`helm get`)
 
@@ -329,7 +339,8 @@ helm uninstall demo-hooks -n helm-lab
 kubectl get job -n helm-lab      # a leftover failed hook Job, if any, is not managed by Helm; delete it
 ```
 
-Keep `demo-dev`. Commit your work, tick Lab 10 in the README, and create `lab-10-complete`.
+Keep `demo-dev`. Commit your work and create a personal tag such as `my-lab-10-complete` (the reference
+`lab-10-complete` tag already exists in this repository).
 
 References: [Chart hooks](https://helm.sh/docs/topics/charts_hooks/),
 [helm upgrade flags](https://helm.sh/docs/helm/helm_upgrade/),

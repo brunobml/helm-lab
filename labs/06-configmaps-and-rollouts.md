@@ -386,8 +386,8 @@ Read the Events section near the bottom for the failing resource or operation.
 - [ ] The checksum is back in the correct location after any experiment.
 - [ ] Port-forwarding is stopped; `demo-dev` stays installed for Lab 7.
 
-Record your observations, mark Lab 6 complete in the README, and commit your
-working changes. Create `lab-06-complete` if that checkpoint does not already exist.
+Record your observations, and commit your
+working changes. Create a personal tag such as `my-lab-06-complete` (the reference `lab-06-complete` tag already exists).
 
 Optional reading: [Kubernetes ConfigMaps](https://kubernetes.io/docs/concepts/configuration/configmap/)
 and [Helm's rollout checksum example](https://helm.sh/docs/v3/howto/charts_tips_and_tricks/#automatically-roll-deployments).

@@ -1,6 +1,6 @@
 # Extension: Identity and secrets
 
-**Start:** Lab 7 or later.
+**Start:** Lab 7 or later (do all four extensions before Lab 10; later labs build on them).
 **Goal:** Configure application identity independently from permissions and secret data.
 
 ## Steps
@@ -111,6 +111,8 @@ serviceAccount:
   create: true
   name: ""
   annotations: {}
+  # Mount an API token into Pods using this ServiceAccount (NGINX doesn't need one).
+  automountToken: false
 
 rbac:
   create: false
@@ -153,6 +155,8 @@ metadata:
   annotations:
     {{- toYaml . | nindent 4 }}
   {{- end }}
+# NGINX never calls the Kubernetes API, so don't mount a token into its Pods.
+automountServiceAccountToken: {{ .Values.serviceAccount.automountToken | default false }}
 {{- end }}
 ```
 

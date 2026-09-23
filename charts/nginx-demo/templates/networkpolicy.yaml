@@ -14,8 +14,14 @@ spec:
     - Egress
   ingress:
     - from:
+        # Pods in the release's own namespace (for example the helm test Pod).
         - podSelector: {}
-        - namespaceSelector: {}
+        {{- range .Values.networkPolicy.allowedNamespaces }}
+        # Pods in an explicitly allowed namespace (for example the Ingress controller's).
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: {{ . | quote }}
+        {{- end }}
       ports:
         - protocol: TCP
           port: {{ .Values.service.targetPort | default 80 }}

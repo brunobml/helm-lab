@@ -74,10 +74,10 @@ resources:
 To understand how your values are actually used, fetch and unpack the chart locally:
 
 ```bash
-mkdir -p /tmp/podinfo-src
-helm pull podinfo/podinfo --version 6.14.0 --untar -d /tmp/podinfo-src
-grep -A 5 "PODINFO_UI_MESSAGE" /tmp/podinfo-src/podinfo/templates/deployment.yaml
-rm -rf /tmp/podinfo-src
+PODINFO_SRC=$(mktemp -d)
+helm pull podinfo/podinfo --version 6.14.0 --untar -d "$PODINFO_SRC"
+grep -A 5 "PODINFO_UI_MESSAGE" "$PODINFO_SRC/podinfo/templates/deployment.yaml"
+rm -rf "$PODINFO_SRC"
 ```
 
 You can see that `ui.message` maps to an environment variable `PODINFO_UI_MESSAGE` inside the container.
@@ -94,10 +94,12 @@ helm template my-podinfo podinfo/podinfo --version 6.14.0 -f values-podinfo.yaml
 helm install my-podinfo podinfo/podinfo --version 6.14.0 -n helm-lab \
   -f values-podinfo.yaml --wait --timeout 90s
 
+kubectl rollout status deployment/my-podinfo -n helm-lab --timeout=90s
 kubectl get pods -n helm-lab -l app.kubernetes.io/name=my-podinfo
 ```
 
-*Expect:* Two Pods in `Running` state (`2/2`).
+*Expect:* Two Pods, each `1/1 Running`. (`--wait` honors the chart's rollout strategy and can return
+while the second Pod is still starting; `rollout status` waits for both.)
 
 Test the service from within the cluster:
 
@@ -280,7 +282,8 @@ rm -f values-podinfo.yaml
 rm -rf post-render
 ```
 
-Tick Lab 14 in the README and create `lab-14-complete`.
+Create a personal tag such as `my-lab-14-complete` (the reference
+`lab-14-complete` tag already exists in this repository).
 
 ---
 

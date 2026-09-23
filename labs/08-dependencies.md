@@ -163,7 +163,8 @@ is not a content hash for every source file; Git tracks those files.
 ## Cleanup and checkpoint
 
 Keep the child source, parent dependency settings, and `Chart.lock` in Git.
-Generated `.tgz` files are ignored. Commit and create `lab-08-complete`.
+Generated `.tgz` files are ignored. Commit and create a personal tag such as `my-lab-08-complete` (the reference
+`lab-08-complete` tag already exists in this repository).
 
 References: [Subcharts and globals](https://helm.sh/docs/v3/chart_template_guide/subcharts_and_globals/),
 [dependency build](https://helm.sh/docs/v3/helm/helm_dependency_build/).

@@ -25,14 +25,14 @@ To pass the `restricted` profile, a pod must satisfy all of the following:
 
 ### Step 1: Switch to unprivileged NGINX and unprivileged port
 
-Standard NGINX (`nginx:alpine`) runs as root (UID 0), listens on privileged port 80, and writes caches to `/var/cache/nginx`. To satisfy `restricted`, we switch to `nginxinc/nginx-unprivileged:1.27-alpine`, which runs as UID 101 (`nginx`) and listens on port 8080.
+Standard NGINX (`nginx:alpine`) runs as root (UID 0), listens on privileged port 80, and writes caches to `/var/cache/nginx`. To satisfy `restricted`, we switch to `nginxinc/nginx-unprivileged:1.30-alpine`, which runs as UID 101 (`nginx`) and listens on port 8080.
 
 In `charts/nginx-demo/values.yaml`:
 
 ```yaml
 image:
   repository: nginxinc/nginx-unprivileged
-  tag: "1.27-alpine"
+  tag: "1.30-alpine"
   pullPolicy: IfNotPresent
 
 service:
@@ -257,8 +257,14 @@ spec:
     - Egress
   ingress:
     - from:
+        # Pods in the release's own namespace (for example the helm test Pod).
         - podSelector: {}
-        - namespaceSelector: {}
+        {{- range .Values.networkPolicy.allowedNamespaces }}
+        # Pods in an explicitly allowed namespace (for example the Ingress controller's).
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: {{ . | quote }}
+        {{- end }}
       ports:
         - protocol: TCP
           port: {{ .Values.service.targetPort | default 80 }}
@@ -279,7 +285,29 @@ Add to `values.yaml`:
 ```yaml
 networkPolicy:
   enabled: false
+  # -- Extra namespaces allowed to reach the Pods (for example `traefik` on kind,
+  # or `kube-system` for k3d's bundled Traefik). The release namespace is always allowed.
+  allowedNamespaces: []
 ```
+
+Add `allowedNamespaces` to the `networkPolicy` entry in `values.schema.json`:
+
+```json
+    "networkPolicy": {
+      "type": "object",
+      "properties": {
+        "enabled": { "type": "boolean" },
+        "allowedNamespaces": { "type": "array", "items": { "type": "string", "minLength": 1 } }
+      }
+    }
+```
+
+> [!NOTE]
+> A `from` entry with `namespaceSelector: {}` matches **every** namespace, which would make the
+> policy allow all in-cluster traffic. Here, `podSelector: {}` alone admits only Pods in the release
+> namespace, and each extra namespace must be listed by name (`kubernetes.io/metadata.name` is a label
+> Kubernetes sets on every namespace). The egress rule still uses `namespaceSelector: {}` on purpose:
+> DNS must reach CoreDNS in `kube-system`.
 
 ---
 
@@ -297,7 +325,7 @@ image:
   # -- Container image repository
   repository: nginxinc/nginx-unprivileged
   # -- Container image tag
-  tag: "1.27-alpine"
+  tag: "1.30-alpine"
   # -- Image pull policy
   pullPolicy: IfNotPresent
 ```
@@ -367,6 +395,17 @@ kubectl get pdb,networkpolicy -n hardened-lab
 
 # Run the test hook:
 helm test hardened-demo -n hardened-lab
+```
+
+Prove that the NetworkPolicy isolates the Pods (on kind, the default CNI enforces NetworkPolicy):
+
+```bash
+# From another namespace: blocked (the request times out)
+kubectl run np-probe -n default --rm -i -q --restart=Never --image=busybox:1.36 -- \
+  wget -qO- -T 3 http://hardened-demo-service.hardened-lab/ || echo "blocked as expected"
+
+# Egress other than DNS is blocked too
+kubectl exec -n hardened-lab deploy/hardened-demo-deployment -- wget -qO- -T 3 http://example.com || echo "egress blocked as expected"
 ```
 
 *Expect:* Two Pods, each `1/1 Running`, PDB active, NetworkPolicy created, and `helm test` succeeds!
@@ -448,7 +487,7 @@ helm unittest charts/nginx-demo
 git status
 ```
 
-*Expect:* All 28 tests in `charts/nginx-demo` pass (`PASS  charts/nginx-demo  ... Tests: 28 passed, 28 total`). Running `helm unittest charts/nginx-demo charts/shop` passes 42/42 tests!
+*Expect:* All 29 tests in `charts/nginx-demo` pass (`Tests: 29 passed, 29 total`). Running `helm unittest charts/nginx-demo charts/shop` passes 43/43 tests!
 
 ---
 

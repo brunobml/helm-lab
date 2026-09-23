@@ -1,6 +1,6 @@
 # Extension: Workload health and scaling
 
-**Start:** Lab 7 or later, with the `resources` template from Lab 4.
+**Start:** Lab 7 or later (do all four extensions before Lab 10; later labs build on them), with the `resources` template from Lab 4.
 **Goal:** Distinguish running, ready, healthy, and automatically scaled workloads.
 
 ## Steps

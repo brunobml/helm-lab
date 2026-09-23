@@ -38,7 +38,7 @@ mkdir -p dist
 helm package ./charts/nginx-demo --destination ./dist
 ```
 
-*Expect:* Helm outputs `Successfully packaged chart and saved it to: ./dist/nginx-demo-0.2.0.tgz`.
+*Expect:* Helm outputs `Successfully packaged chart and saved it to: dist/nginx-demo-0.2.0.tgz`.
 
 ---
 
@@ -247,8 +247,8 @@ are gone. Delete the dedicated GitOps namespace afterward if desired. Follow
 your registry's UI/CLI to remove the published test artifact if you no longer
 need it. Keep source files; `dist/` stays ignored.
 
-Record A/B/C completion separately. Create `lab-09-complete` after completing
-all three; if external setup is deferred, record that instead of marking it done.
+Record A/B/C completion separately. Create a personal tag such as `my-lab-09-complete` (the reference `lab-09-complete`
+tag already exists) after completing all three; if external setup is deferred, record that instead of marking it done.
 
 References: [OCI registries](https://helm.sh/docs/v3/topics/registries/),
 [Argo CD Helm support](https://argo-cd.readthedocs.io/en/stable/user-guide/helm/).

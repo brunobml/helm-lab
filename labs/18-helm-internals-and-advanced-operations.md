@@ -371,7 +371,7 @@ Helm reads the **current** release manifest from the release Secret to build the
 Install the official Helm plugin for migrating release metadata:
 
 ```bash
-helm plugin install https://github.com/helm/helm-mapkubeapis
+helm plugin install https://github.com/helm/helm-mapkubeapis --version v0.6.1
 ```
 
 Verify the plugin is installed:
@@ -426,7 +426,10 @@ Expected error:
 
 ```text
 Error: UPGRADE FAILED: unable to build kubernetes objects from current release manifest: resource mapping not found for name: "pdb-demo-deployment" namespace: "" from "": no matches for kind "PodDisruptionBudget" in version "policy/v1beta1"
+ensure CRDs are installed first
 ```
+
+(Ignore the generic `ensure CRDs are installed first` hint: `PodDisruptionBudget` is a built-in kind; the real cause is the removed `policy/v1beta1` API.)
 
 The release is stuck. You cannot upgrade it even though your chart has the modern `policy/v1` template!
 

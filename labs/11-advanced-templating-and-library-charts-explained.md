@@ -69,7 +69,7 @@ A Deployment's `spec.selector` is **immutable**. Changing selector labels makes 
 
 - `nginx-demo.labels` is descriptive metadata; changing it triggers a rolling update at worst.
 - `selectorLabels` feed `spec.selector.matchLabels`. Editing them yields `field is immutable` on upgrade, and only deleting the Deployment fixes it.
-- The `diff - /tmp/before-dev.yaml` check is the safety net: identical output means existing releases are unaffected. Run it for every shared-helper refactor.
+- The `diff - $LAB_TMP/before-dev.yaml` check is the safety net: identical output means existing releases are unaffected. Run it for every shared-helper refactor.
 - Library-defined names are **global** across a chart and its dependencies (all templates share one namespace). Always prefix (`lab-common.labels`, not `labels`). A parent's `define` with the same name silently overrides a library's; this is also how a chart can customize a library default, but do it on purpose.
 - Library charts are versioned and packaged like any chart: bump `lab-common`, run `helm dependency update` in consumers, and commit the new `Chart.lock`.
 
@@ -113,7 +113,7 @@ Anywhere rendering happens without a live API connection: `helm template`, `--dr
 
 ## Break It and Recover — Detailed Walkthrough
 
-Lab 11 covers three templating and validation failure modes. Perform each using a temporary scratch values file (`/tmp/bad.yaml`) with `-f` so you do not modify `values-dev.yaml`.
+Lab 11 covers three templating and validation failure modes. Perform each using a temporary scratch values file (`$LAB_TMP/bad.yaml`) with `-f` so you do not modify `values-dev.yaml`.
 
 ### Scenario 1: A `tpl` Expression on a Missing Key
 
@@ -121,7 +121,7 @@ Lab 11 covers three templating and validation failure modes. Perform each using 
 
 Pass a template expression in values that attempts to access a nested property (`.Values.team.name`) on a non-existent parent (`team` is not defined in `values.yaml`):
 
-`/tmp/bad.yaml`:
+`$LAB_TMP/bad.yaml`:
 
 ```yaml
 extraConfigMaps:
@@ -132,7 +132,7 @@ extraConfigMaps:
 #### 2. Run the Command
 
 ```bash
-helm template d ./charts/nginx-demo -f /tmp/bad.yaml
+helm template d ./charts/nginx-demo -f $LAB_TMP/bad.yaml
 ```
 
 #### 3. The Error Observed
@@ -143,7 +143,7 @@ Error: ... executing "gotpl" at <.Values.team.name>: nil pointer evaluating inte
 
 #### 4. Why This Failed
 
-- When `tpl` evaluates `"{{ .Values.team.name }}"`, it looks up `.Values.team`. Because `team` is not defined in `values.yaml` or `/tmp/bad.yaml`, it evaluates to `nil`.
+- When `tpl` evaluates `"{{ .Values.team.name }}"`, it looks up `.Values.team`. Because `team` is not defined in `values.yaml` or `$LAB_TMP/bad.yaml`, it evaluates to `nil`.
 - Evaluating `.name` on `nil` triggers a Go template nil-pointer evaluation error.
 - Note that this is **not** a `required` validation failure. Go templates panic before any validation logic can run because an uninstantiated map was traversed.
 
@@ -163,7 +163,7 @@ There are two ways to resolve this:
    Test rendering:
 
    ```bash
-   helm template d ./charts/nginx-demo -f /tmp/bad.yaml --show-only templates/extra-configmaps.yaml
+   helm template d ./charts/nginx-demo -f $LAB_TMP/bad.yaml --show-only templates/extra-configmaps.yaml
    ```
 
    *Output:* `OWNER: "unassigned"` renders cleanly without errors.
@@ -259,7 +259,7 @@ nginx-demo:
 Supply a valid map of key-value pairs (or YAML object). Clean up any temporary files:
 
 ```bash
-rm -f /tmp/bad.yaml
+rm -f $LAB_TMP/bad.yaml
 ```
 
 ---

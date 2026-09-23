@@ -16,10 +16,11 @@ Work outside the repository so you do not disturb the lab chart.
 ### Step 1: Create the scratch chart
 
 ```bash
-mkdir -p /tmp/tplplay/templates && cd /tmp/tplplay
+LAB_REPO=$(pwd); LAB_TMP=$(mktemp -d)   # scratch space; reuse it for the rest of this lab
+mkdir -p "$LAB_TMP/tplplay/templates" && cd "$LAB_TMP/tplplay"
 ```
 
-`/tmp/tplplay/Chart.yaml`:
+`$LAB_TMP/tplplay/Chart.yaml`:
 
 ```yaml
 apiVersion: v2
@@ -27,7 +28,7 @@ name: tplplay
 version: 0.1.0
 ```
 
-`/tmp/tplplay/values.yaml`:
+`$LAB_TMP/tplplay/values.yaml`:
 
 ```yaml
 replicas: 2
@@ -36,7 +37,7 @@ name: ""
 greeting: "Hello from {{ .Release.Name }}"
 ```
 
-`/tmp/tplplay/templates/play.yaml`:
+`$LAB_TMP/tplplay/templates/play.yaml`:
 
 ```yaml
 apiVersion: v1
@@ -134,7 +135,7 @@ kubectl get secret p-token -n helm-lab -o jsonpath='{.data.token}'; echo
 > would be regenerated on every sync. For secrets under GitOps, use an external secret manager
 > (see the Identity extension) instead.
 
-Clean up: `helm uninstall p -n helm-lab && cd - && rm -rf /tmp/tplplay`
+Clean up: `helm uninstall p -n helm-lab && cd "$LAB_REPO" && rm -rf "$LAB_TMP/tplplay"`
 
 ## Part B: `tpl` in the real chart
 
@@ -176,7 +177,7 @@ when several charts share conventions (labels, ConfigMaps, security contexts).
 You are about to refactor. Prove afterward that nothing changed:
 
 ```bash
-helm template demo-dev ./charts/nginx-demo -f ./charts/nginx-demo/values-dev.yaml > /tmp/before-dev.yaml
+helm template demo-dev ./charts/nginx-demo -f ./charts/nginx-demo/values-dev.yaml > "$LAB_TMP/before-dev.yaml"
 ```
 
 ### Step 7: Create `charts/lab-common`
@@ -191,15 +192,16 @@ type: library
 version: 0.1.0
 ```
 
-`charts/lab-common/templates/_labels.tpl` (moves your standard labels here):
+`charts/lab-common/templates/_labels.tpl` (moves your standard, **non-selector** labels here):
 
 ```yaml
 {{/*
-lab-common.labels: standard labels. Call with the root context:
+lab-common.labels: standard descriptive labels. Call with the root context:
   {{ include "lab-common.labels" . }}
+Deliberately excludes any selector label: each chart keeps its own selectorLabels,
+so shared metadata never makes a Pod match another workload's Service.
 */}}
 {{- define "lab-common.labels" -}}
-app: {{ .Release.Name }}
 app.kubernetes.io/name: {{ .Chart.Name }}
 app.kubernetes.io/instance: {{ .Release.Name }}
 app.kubernetes.io/version: {{ .Chart.AppVersion | quote }}
@@ -264,18 +266,20 @@ helm dependency update ./charts/nginx-demo
 ### Step 9: Delegate the labels
 
 In `charts/nginx-demo/templates/_helpers.tpl`, replace the body of `nginx-demo.labels` (keep
-`nginx-demo.selectorLabels` exactly as is; selectors are immutable):
+`nginx-demo.selectorLabels` exactly as is; selectors are immutable). The chart combines its own
+selector label with the library's descriptive labels:
 
 ```yaml
 {{- define "nginx-demo.labels" -}}
-{{- include "lab-common.labels" . -}}
+{{ include "nginx-demo.selectorLabels" . }}
+{{ include "lab-common.labels" . }}
 {{- end -}}
 ```
 
 Prove the refactor changed nothing:
 
 ```bash
-helm template demo-dev ./charts/nginx-demo -f ./charts/nginx-demo/values-dev.yaml | diff - /tmp/before-dev.yaml && echo "identical"
+helm template demo-dev ./charts/nginx-demo -f ./charts/nginx-demo/values-dev.yaml | diff - "$LAB_TMP/before-dev.yaml" && echo "identical"
 ```
 
 *Expect:* `identical`. A refactor that changes rendered output is a change, not a refactor.
@@ -370,7 +374,7 @@ helm test demo-tpl -n helm-lab --timeout 60s
 
 ## Break it and recover
 
-Do each in a scratch values file (for example `/tmp/bad.yaml`) passed with `-f`; do not edit
+Do each in a scratch values file (for example `"$LAB_TMP/bad.yaml"`) passed with `-f`; do not edit
 `values-dev.yaml`.
 
 1. **A `tpl` expression on a missing key.**
@@ -421,11 +425,12 @@ Do each in a scratch values file (for example `/tmp/bad.yaml`) passed with `-f`;
 
 ```bash
 helm uninstall demo-tpl -n helm-lab
-rm -f /tmp/before-dev.yaml /tmp/bad.yaml
+rm -rf "$LAB_TMP"
 ```
 
 Keep `demo-dev`. Commit your work (`charts/nginx-demo/charts/*.tgz` stays ignored, but keep
-`Chart.lock`), tick Lab 11 in the README, and create `lab-11-complete`.
+`Chart.lock`), and create a personal tag such as `my-lab-11-complete` (the reference
+`lab-11-complete` tag already exists in this repository).
 
 References: [Named templates and library charts](https://helm.sh/docs/topics/library_charts/),
 [Template functions](https://helm.sh/docs/chart_template_guide/function_list/),

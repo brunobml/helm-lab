@@ -33,13 +33,14 @@ Below are in-depth explanations and answers for the questions posed in the **Exp
                backend:
                  service:
                    name: demo-dev-service
-                   port: 80
+                   port:
+                     number: 80
      ```
 
    - On its own, the Kubernetes API server does **not** listen on port 80/443 or route external HTTP packets.
 
 2. **The Ingress Controller Does the Real Work:**
-   - A cluster must run an Ingress Controller (k3s includes Traefik by default; kind or cloud clusters often install `ingress-nginx`).
+   - A cluster must run an Ingress Controller (k3s/k3d include Traefik by default; on kind this lab installs Traefik with its Helm chart. The community `ingress-nginx` controller was retired in March 2026).
    - The controller has a control loop that:
      1. Queries `IngressClass` (e.g. `ingressClassName: traefik` or `nginx`).
      2. Reads the routing rules and backend Services.
@@ -87,14 +88,14 @@ Notice:
 
 - `helm upgrade` completed with exit code 0.
 - Kubernetes successfully created the `Ingress` object.
-- However, the `ADDRESS` column remains **completely blank**!
+- The `ADDRESS` column is blank. (Don't rely on this alone: on kind it's blank even for the correct class, because the controller Service is `ClusterIP`. The curl result below is the reliable signal.)
 
 #### 3. Test Ingress Traffic Routing
 
 Attempt to send traffic to the Ingress controller using the virtual host:
 
 ```bash
-kubectl run curl-test --image=curlimages/curl:8.5.0 --rm -i --restart=Never -- -s -i -H "Host: chart-example.local" http://ingress-nginx-controller.ingress-nginx.svc.cluster.local/
+kubectl run curl-test --image=curlimages/curl:8.5.0 --rm -i --restart=Never -- -s -i -H "Host: chart-example.local" "$TRAEFIK"   # http://traefik.traefik.svc.cluster.local/ on kind, http://traefik.kube-system.svc.cluster.local/ on k3d
 ```
 
 *Output:*
@@ -105,24 +106,24 @@ HTTP/1.1 404 Not Found
 
 #### 4. Why This Failed
 
-- In modern Kubernetes (`networking.k8s.io/v1`), Ingress controllers only process Ingress objects whose `spec.ingressClassName` matches their registered class name (e.g. `nginx` in `ingress-nginx`, or `traefik` in k3s/k3d).
+- In modern Kubernetes (`networking.k8s.io/v1`), Ingress controllers only process Ingress objects whose `spec.ingressClassName` matches their registered class name (for example `traefik` for Traefik).
 - Because `className` was `nonexistent`, the Ingress controller ignored the resource completely.
 - The Ingress object sat dormant in etcd, unmanaged by any controller.
 
 #### 5. How to Recover
 
-Restore the valid Ingress class (e.g. `nginx` or `traefik`):
+Restore the valid Ingress class (`traefik`):
 
 ```bash
 helm upgrade demo-dev ./charts/nginx-demo -n helm-lab \
   --reset-values -f ./charts/nginx-demo/values-dev.yaml \
-  --set ingress.enabled=true --set ingress.className=nginx --wait --timeout 120s
+  --set ingress.enabled=true --set ingress.className=traefik --wait --timeout 120s
 ```
 
 Verify that the Ingress routes HTTP traffic:
 
 ```bash
-kubectl run curl-test --image=curlimages/curl:8.5.0 --rm -i --restart=Never -- -s -H "Host: chart-example.local" http://ingress-nginx-controller.ingress-nginx.svc.cluster.local/
+kubectl run curl-test --image=curlimages/curl:8.5.0 --rm -i --restart=Never -- -s -H "Host: chart-example.local" "$TRAEFIK"   # http://traefik.traefik.svc.cluster.local/ on kind, http://traefik.kube-system.svc.cluster.local/ on k3d
 ```
 
 *Output:*

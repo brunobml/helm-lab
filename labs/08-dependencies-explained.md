@@ -134,8 +134,8 @@ helm dependency build ./charts/nginx-demo
 *Output:*
 
 ```text
-Getting lab-banner 0.1.0 from source chart
-Saving 1 charts to charts/
+Saving 1 charts
+Deleting outdated charts
 ```
 
 Verify that rendering works again:

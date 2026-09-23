@@ -9,7 +9,8 @@ app: {{ .Release.Name }}
 Common labels (shared with other lab charts through the lab-common library)
 */}}
 {{- define "nginx-demo.labels" -}}
-{{- include "lab-common.labels" . -}}
+{{ include "nginx-demo.selectorLabels" . }}
+{{ include "lab-common.labels" . }}
 {{- end -}}
 
 {{/*

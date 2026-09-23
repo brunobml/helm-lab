@@ -62,7 +62,7 @@ helmfile --version || {
 Verify that the `diff` plugin is installed in Helm (required by `helmfile diff`):
 
 ```bash
-helm plugin list | grep diff || helm plugin install https://github.com/databus23/helm-diff
+helm plugin list | grep diff || helm plugin install https://github.com/databus23/helm-diff --version v3.15.13
 ```
 
 ---
@@ -406,7 +406,7 @@ Simulate a cycle: edit `helmfile/helmfile.yaml.gotmpl` so that `backend-db` decl
 Run `helmfile -e dev diff`:
 
 ```text
-in ./helmfile.yaml.gotmpl: in release "backend-db": cycle detected: backend-db -> frontend-web -> backend-api -> backend-db
+in ./helmfile.yaml.gotmpl: cycle detected: helm-lab-dev/backend-api -> helm-lab-dev/frontend-web -> helm-lab-dev/backend-db -> helm-lab-dev/backend-api
 ```
 
 Helmfile's internal DAG validator detects the cycle and halts execution before any commands are executed against the Kubernetes cluster.

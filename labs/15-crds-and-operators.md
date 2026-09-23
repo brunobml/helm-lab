@@ -214,13 +214,13 @@ Inspect the default CRD configuration in `jetstack/cert-manager`:
 ```bash
 helm repo add jetstack https://charts.jetstack.io
 helm repo update jetstack
-helm show values jetstack/cert-manager --version v1.16.2 | grep -A 15 "crds:"
+helm show values jetstack/cert-manager --version v1.21.2 | grep -A 15 "crds:"
 ```
 
 Notice two critical settings:
 
 1. `crds.enabled: false` (default): By default, cert-manager expects operators to install CRDs out-of-band via `kubectl apply -f https://github.com/cert-manager/cert-manager/releases/download/.../cert-manager.crds.yaml`.
-2. When `crds.enabled: true`: cert-manager renders CRDs as regular manifests inside `templates/`, but attaches a special annotation:
+2. When `crds.enabled: true`: cert-manager renders CRDs as regular manifests inside `templates/`, and, because `crds.keep: true` is also the default, attaches a special annotation:
    `helm.sh/resource-policy: keep`
 
 Why does cert-manager do this?
@@ -230,13 +230,13 @@ Why does cert-manager do this?
 
 ### Step 6: Install `cert-manager` with managed CRDs
 
-Install `cert-manager` v1.16.2 into its own namespace with `crds.enabled=true`:
+Install `cert-manager` v1.21.2 into its own namespace with `crds.enabled=true`:
 
 ```bash
 helm install cert-manager jetstack/cert-manager \
   --namespace cert-manager \
   --create-namespace \
-  --version v1.16.2 \
+  --version v1.21.2 \
   --set crds.enabled=true \
   --wait
 ```

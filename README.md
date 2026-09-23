@@ -24,55 +24,75 @@ labs/               Ordered exercises, hints, and completion checks
 labs/extensions/    Optional Kubernetes-focused exercises
 ```
 
-The chart previously lived at `helm-lab/`; its path is now `charts/nginx-demo/`.
-Existing cluster releases are not migrated by this repository change. Start these
-labs with the release names below in a dedicated learning namespace.
+## Before you start
 
-## Set up once
+You need a terminal with Bash (macOS, Linux, or WSL2 on Windows) and these tools:
 
-Use Bash (or a compatible shell), Git, Helm, kubectl, curl, and a disposable
-Kubernetes cluster. You should recognize a Pod, Deployment, Service, and namespace;
-Lab 1 connects those objects to Helm.
+| Tool | Why | Install |
+| --- | --- | --- |
+| Git | Get the labs and track your progress | [git-scm.com](https://git-scm.com/downloads) |
+| Docker | Runs the local Kubernetes cluster | [Docker Desktop / Engine](https://docs.docker.com/get-docker/) |
+| kind **or** k3d | Creates a disposable local cluster | [kind](https://kind.sigs.k8s.io/docs/user/quick-start/#installation), [k3d](https://k3d.io/#installation) |
+| kubectl | Talks to the cluster | [kubectl](https://kubernetes.io/docs/tasks/tools/) |
+| Helm 3 (v3.17+) | The tool you are learning | [Helm](https://helm.sh/docs/intro/install/) |
+| curl | Tests HTTP from your machine | usually preinstalled |
 
-All labs and extensions have been verified end-to-end on Kubernetes v1.35.0 (kind and k3d) and Helm v3.19.0.
-Record your Helm and Kubernetes server versions in your learning notes. These instructions use Helm 3
-semantics; consult the matching documentation if using another major version.
+Later labs add a few more tools (for example `sops` and `cosign` in Lab 12, `helmfile` in Lab 17);
+each lab lists and installs what it needs, and the [learning path](#learning-path) shows where.
 
-For a local cluster, install Docker and either [kind](https://kind.sigs.k8s.io/docs/user/quick-start/)
-or [k3d](https://k3d.io/), then run:
+You should recognize a Pod, Deployment, Service, and namespace. If those words are new, spend
+30 minutes on the official [Kubernetes Basics tutorial](https://kubernetes.io/docs/tutorials/kubernetes-basics/)
+first; Lab 1 then connects those objects to Helm.
 
-```bash
-# With kind:
-kind create cluster --name helm-lab --wait 120s
-kubectl config use-context kind-helm-lab
+All labs and extensions were verified end to end on Kubernetes v1.35.0 (kind and k3d) with Helm v3.19.0.
+These instructions use Helm 3 semantics.
 
-# Or with k3d:
-k3d cluster create helm-lab
-kubectl config use-context k3d-helm-lab
+## Start here
 
-# Verify connectivity:
-kubectl cluster-info
-kubectl get nodes
-helm version --short
-kubectl version
-```
+1. **Get the labs and check your tools:**
 
-If you already have a disposable cluster, select its context instead. Run **all
-lab commands from this repository's root**. Rendering and linting work without a
-cluster; installs, upgrades, port-forwarding, and Helm tests need one.
+   ```bash
+   git clone https://github.com/brunobml/helm-lab.git
+   cd helm-lab
+   helm version --short      # v3.17 or newer
+   kubectl version --client
+   docker info --format '{{.ServerVersion}}'
+   ```
 
-```bash
-helm lint ./charts/nginx-demo
-helm template demo-dev ./charts/nginx-demo
-```
+2. **Create a disposable local cluster** (pick one):
 
-Start with [Lab 0](labs/00-chart-creation.md) to scaffold your chart with `helm create`,
-or jump to [Lab 1](labs/01-first-chart.md) if you want to start directly with the prebuilt starter.
+   ```bash
+   # With kind:
+   kind create cluster --name helm-lab --wait 120s
+   kubectl config use-context kind-helm-lab
+
+   # Or with k3d:
+   k3d cluster create helm-lab
+   kubectl config use-context k3d-helm-lab
+
+   # Either way, check that the cluster answers:
+   kubectl get nodes          # expect one node with STATUS Ready
+   ```
+
+3. **Create your practice branch.** `main` holds the finished reference solution, so do your own work
+   on a branch that starts from the minimal scaffold:
+
+   ```bash
+   git switch -c my-learning lab-00-start
+   ```
+
+4. **Start with [Lab 0](labs/00-chart-creation.md)** (build the starter chart yourself), or go straight
+   to [Lab 1](labs/01-first-chart.md) (the branch already contains Lab 0's result).
+
+Run **every lab command from the repository root**. Rendering and linting work without a cluster;
+installs, upgrades, port-forwarding, and Helm tests need one.
 
 ## Learning path
 
-Check off a lab when its verification steps pass and you can answer its questions.
-If you already completed the original fundamentals, use Labs 0–3 as a short review.
+Work through the stages in order. Check off a lab when its verification steps pass and you can
+answer its questions.
+
+### Stage 1 — Foundations (no extra tools)
 
 - [ ] [0. Chart creation](labs/00-chart-creation.md) — scaffold with helm create, strip boilerplate, and set metadata
 - [ ] [1. First chart](labs/01-first-chart.md) — connect values, templates, and running resources
@@ -82,24 +102,56 @@ If you already completed the original fundamentals, use Labs 0–3 as a short re
 - [ ] [5. Helpers and labels](labs/05-helpers-and-labels.md) — reuse code without breaking selectors
 - [ ] [6. ConfigMaps and rollouts](labs/06-configmaps-and-rollouts.md) — change the page through Helm
 - [ ] [7. Validation and tests](labs/07-validation-and-tests.md) — catch invalid inputs and test HTTP
+
+### Stage 2 — Composing and shipping charts
+
 - [ ] [8. Dependencies](labs/08-dependencies.md) — compose charts and lock versions
-- [ ] [9. Packaging and GitOps](labs/09-packaging-and-gitops.md) — distribute and reconcile the chart
+- [ ] [9. Packaging and GitOps](labs/09-packaging-and-gitops.md) — distribute and reconcile the chart (Part C optionally uses Argo CD)
+
+### Stage 3 — Kubernetes features in your chart (extensions)
+
+These four short exercises add Ingress, probes and autoscaling, identity, and storage. They are
+listed separately because they focus on Kubernetes rather than Helm, but **Labs 10–18 build on the
+chart features they add** (for example, Lab 12's unit tests check the autoscaling and
+`existingSecret` logic). Do them before Lab 10.
+
+- [ ] [Networking](labs/extensions/networking.md) — Service types and Ingress (installs Traefik on kind)
+- [ ] [Workload health and scaling](labs/extensions/health-and-scaling.md) — probes, resources, and HPA
+- [ ] [Identity and secrets](labs/extensions/identity-and-secrets.md) — ServiceAccounts, RBAC, and Secret references
+- [ ] [Storage and other workloads](labs/extensions/storage-and-workloads.md) — persistence, Jobs, and StatefulSets
+
+### Stage 4 — Operating releases (extra tools: helm-diff; Lab 12: sops, age, cosign, chart-testing)
+
 - [ ] [10. Hooks and failure recovery](labs/10-hooks-and-failure-recovery.md) — lifecycle hooks, `--atomic`, diffing, and stuck releases
 - [ ] [11. Advanced templating and library charts](labs/11-advanced-templating-and-library-charts.md) — `tpl`, `required`, `lookup`, and shared helpers
 - [ ] [12. Secrets, signing, and CI](labs/12-secrets-signing-and-ci.md) — SOPS secrets, unit tests, provenance/cosign, and chart-testing
 - [ ] [13. Capstone: a three-tier release](labs/13-capstone.md) — umbrella chart, hooks, secrets, probes, CI, and publishing
+
+### Stage 5 — Production and advanced topics (extra tools: helmfile in Lab 17)
+
 - [ ] [14. Consuming third-party charts](labs/14-consuming-third-party-charts.md) — repositories, minimal overrides, diffing, post-rendering with Kustomize, and rollback
 - [ ] [15. CRDs and operators](labs/15-crds-and-operators.md) — the `crds/` directory, cert-manager, upgrade traps, and ordering
 - [ ] [16. Production hardening and chart best practices](labs/16-production-hardening-and-best-practices.md) — Pod Security restricted, PDB, NetworkPolicy, helm-docs, and kubeconform
 - [ ] [17. Many releases: Helmfile (and Argo CD ApplicationSet)](labs/17-many-releases-helmfile-and-applicationset.md) — Helmfile orchestration, environments, DAG dependencies, label filtering, and Argo CD ApplicationSet
 - [ ] [18. Helm internals and advanced operations](labs/18-helm-internals-and-advanced-operations.md) — release Secrets, 3-way merge patch, `--take-ownership`, deprecated APIs (`mapkubeapis`), and Helm 4 SSA
 
-Optional extensions after Lab 7:
+## If you get stuck
 
-- [Networking](labs/extensions/networking.md): Service types and Ingress
-- [Workload health and scaling](labs/extensions/health-and-scaling.md): probes, resources, and HPA
-- [Identity and secrets](labs/extensions/identity-and-secrets.md): ServiceAccounts, RBAC, and Secret references
-- [Storage and other workloads](labs/extensions/storage-and-workloads.md): persistence, Jobs, and StatefulSets
+Most problems learners hit are one of these:
+
+| Symptom | Likely cause and fix |
+| --- | --- |
+| `Error: Kubernetes cluster unreachable` or resources appear in the wrong cluster | Wrong kubectl context. Run `kubectl config current-context` and switch with `kubectl config use-context kind-helm-lab` (or `k3d-helm-lab`). |
+| `Error: path "./charts/nginx-demo" not found` | You are not in the repository root. `cd` back to the `helm-lab` folder. |
+| First `helm install ... --wait` fails with `context deadline exceeded` | The image is still downloading. Check with `kubectl get pods -n helm-lab` and `kubectl describe pod ...`; rerun with a longer `--timeout 300s`. |
+| `YAML parse error` or `did not find expected '-' indicator` | Indentation in a template. Render with `helm template demo-dev ./charts/nginx-demo --debug` to see the generated YAML and the line number. |
+| `cannot re-use a name that is still in use` | The release already exists. Use `helm upgrade` instead, or `helm uninstall <name> -n helm-lab` first. |
+| `another operation (install/upgrade/rollback) is in progress` | A previous command was interrupted. See [Lab 10, Part D5](labs/10-hooks-and-failure-recovery.md). |
+| `bind: address already in use` on `port-forward` | Another port-forward is still running. Stop it (`kill %1` or Ctrl+C), or use another local port such as `8081:80`. |
+| An upgrade "forgot" your dev settings (replicas, page, env vars) | Upgrades with `--set` start from chart defaults. Always add `--reset-values -f ./charts/nginx-demo/values-dev.yaml` (explained in Lab 3). |
+| Your files differ from the lab and you can't see why | Compare with the reference: `git diff lab-NN-complete -- charts/nginx-demo` (NN = the lab you just finished). |
+
+Each lab also links an `-explained.md` page with the reasoning behind every step and a walkthrough of its "Break it and recover" exercise.
 
 ## Checkpoints and how to use this repository
 
@@ -183,6 +235,9 @@ Want to practice a specific topic (e.g., Lab 4: Template Logic or Lab 6: ConfigM
 
    # To start Lab 6, start from Lab 5's completion:
    git checkout -b practice-lab-06 lab-05-complete
+
+   # To start Lab 10, start after the four extensions:
+   git checkout -b practice-lab-10 extension-storage-complete
    ```
 
 2. Follow the lab guide, make your changes, and test.
@@ -210,7 +265,7 @@ cd ../helm-lab-practice
 When you are done:
 
 ```bash
-cd /home/bleite/repos/helm-lab
+cd ../helm-lab   # back to this repository
 git worktree remove ../helm-lab-practice
 ```
 

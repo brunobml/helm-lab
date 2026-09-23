@@ -27,8 +27,7 @@ working state. Do not save the broken state as the completion checkpoint.
 
 ## Cleanup and checkpoint
 
-Say which releases/files to keep or remove. Commit successful work, update the
-README checkbox, and create `lab-NN-complete`.
+Say which releases/files to keep or remove. Commit successful work and create a personal tag such as `my-lab-NN-complete`.
 
 <details>
 <summary>Hint — open after attempting the exercise</summary>

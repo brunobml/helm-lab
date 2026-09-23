@@ -1,6 +1,6 @@
 # Extension: Networking
 
-**Start:** Lab 7 or later; save a checkpoint before experimenting.
+**Start:** Lab 7 or later (do all four extensions before Lab 10; later labs build on them); save a checkpoint before experimenting.
 **Goal:** Separate chart rendering from the cluster infrastructure needed for traffic.
 
 ## Steps
@@ -23,29 +23,46 @@ Create an ingress values file with a host and path, render with it, and inspect
 the backend. Disabled output has no Ingress; enabled output has the expected
 host, pathType, class, and backend port.
 
-After deploying your values (using your cluster's IngressClass, e.g. `traefik` for k3d/k3s or `nginx` for kind):
+Deploy with a real Ingress controller. This lab uses **Traefik**: k3d/k3s ships it
+(IngressClass `traefik` in `kube-system`), and on kind you install it with its Helm chart:
 
 ```bash
-# If using kind without an ingress controller, install ingress-nginx:
-# helm repo add ingress-nginx https://kubernetes.github.io/ingress-nginx
-# helm upgrade --install ingress-nginx ingress-nginx/ingress-nginx -n ingress-nginx \
-#   --create-namespace --set controller.service.type=ClusterIP --wait
+# kind only (k3d/k3s already runs Traefik in kube-system):
+helm repo add traefik https://traefik.github.io/charts
+helm upgrade --install traefik traefik/traefik --version 41.6.0 -n traefik --create-namespace \
+  --set service.spec.type=ClusterIP --wait
+kubectl get ingressclass   # expect: traefik
+```
 
+> [!NOTE]
+> The community `ingress-nginx` controller was retired by the Kubernetes project (best-effort
+> maintenance ended in March 2026), so it is no longer the default here. If your organization still
+> runs it, the chart works the same way with `--set ingress.className=nginx`.
+
+Enable the Ingress while keeping your dev values:
+
+```bash
 helm upgrade demo-dev ./charts/nginx-demo -n helm-lab \
   --reset-values -f ./charts/nginx-demo/values-dev.yaml \
-  --set ingress.enabled=true --set ingress.className=nginx --wait --timeout 120s
+  --set ingress.enabled=true --set ingress.className=traefik --wait --timeout 120s
 kubectl get ingress -n helm-lab
 ```
 
-Test routing through the Ingress controller using an ephemeral curl Pod (adjust the controller Service DNS for your cluster):
+Test routing through the controller from an ephemeral curl Pod. The controller Service DNS name
+depends on where Traefik runs:
 
 ```bash
-# For ingress-nginx:
-kubectl run curl-test --image=curlimages/curl:8.5.0 --rm -i --restart=Never -- -s -H "Host: chart-example.local" http://ingress-nginx-controller.ingress-nginx.svc.cluster.local/
+# kind (Traefik installed above, namespace traefik):
+TRAEFIK=http://traefik.traefik.svc.cluster.local/
+# k3d/k3s (bundled Traefik, namespace kube-system):
+# TRAEFIK=http://traefik.kube-system.svc.cluster.local/
 
-# For k3s/k3d Traefik:
-# kubectl run curl-test --image=curlimages/curl:8.5.0 --rm -i --restart=Never -- -s -H "Host: chart-example.local" http://traefik.kube-system.svc.cluster.local/
+kubectl run curl-test -n helm-lab --image=curlimages/curl:8.5.0 --rm -i --restart=Never -- \
+  -s -H "Host: chart-example.local" "$TRAEFIK"
 ```
+
+*Expect:* your page's HTML. Use the curl response as the signal. On kind, the Ingress `ADDRESS`
+column stays blank because the controller Service is `ClusterIP`; on k3d it shows a node IP.
 
 ## Break it and recover
 
@@ -57,7 +74,15 @@ helm upgrade demo-dev ./charts/nginx-demo -n helm-lab \
   --set ingress.enabled=true --set ingress.className=nonexistent --wait
 ```
 
-Observe that rendering and applying still succeed, but the Ingress controller ignores the resource and traffic returns HTTP 404. Then restore the correct class using the upgrade command with `--set ingress.className=nginx` (or `traefik`). A `LoadBalancer` Service may stay pending on a local cluster without a cloud controller or MetalLB.
+Observe that rendering and applying still succeed, but the Ingress controller ignores the resource and traffic returns HTTP 404:
+
+```bash
+kubectl run curl-test -n helm-lab --image=curlimages/curl:8.5.0 --rm -i --restart=Never -- \
+  -s -o /dev/null -w '%{http_code}\n' -H "Host: chart-example.local" "$TRAEFIK"
+```
+
+Then restore the correct class with `--set ingress.className=traefik`. A `LoadBalancer` Service stays
+pending on kind (no cloud controller or MetalLB), while k3d's bundled ServiceLB assigns a node IP.
 
 ## Explain
 
@@ -68,8 +93,15 @@ What creates an Ingress object, and what actually handles its traffic?
 
 ## Cleanup and checkpoint
 
-Disable the Ingress through a Helm upgrade, restore ClusterIP, and remove any
-controller you installed solely for this exercise. Save `extension-networking-complete`.
+Disable the Ingress and restore your dev configuration, then remove the controller if you installed
+it only for this exercise (kind):
+
+```bash
+helm upgrade demo-dev ./charts/nginx-demo -n helm-lab --reset-values -f ./charts/nginx-demo/values-dev.yaml --wait
+helm uninstall traefik -n traefik && kubectl delete namespace traefik
+```
+
+Save `extension-networking-complete`.
 
 <details>
 <summary>Hint: values.yaml configuration block</summary>

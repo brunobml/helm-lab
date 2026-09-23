@@ -37,6 +37,13 @@ Images used: `postgres:16-alpine`, `postgrest/postgrest:v12.2.3`, `busybox:1.36`
 | The web chart's own hook and banner subchart are switched off (`web.migration.enabled`, `web.lab-banner.enabled`) | The capstone has one migration. |
 | PostgREST connects as the database owner and switches to a `NOLOGIN` role per request | Fine for a lab; a real deployment would use a separate low-privilege login role. |
 
+Create a scratch directory for rendered files and packages (run the lab from the same shell, or
+re-run this line in a new one):
+
+```bash
+LAB_TMP=$(mktemp -d)
+```
+
 ## Part A: The two new tiers
 
 Create the directories:
@@ -711,8 +718,8 @@ ls charts/shop/charts
 ```bash
 helm lint charts/shop --set credentials.dbPassword=x
 helm template s charts/shop                                        # fails on purpose
-helm template s charts/shop --set credentials.dbPassword='p@ss/w:rd' > /tmp/shop.yaml
-grep -E "^kind:" /tmp/shop.yaml | sort | uniq -c
+helm template s charts/shop --set credentials.dbPassword='p@ss/w:rd' > $LAB_TMP/shop.yaml
+grep -E "^kind:" $LAB_TMP/shop.yaml | sort | uniq -c
 helm template s charts/shop --set credentials.dbPassword='p@ss/w:rd' -s templates/credentials-secret.yaml
 ```
 
@@ -723,7 +730,7 @@ kinds are 2 ConfigMap (page + migrations), 2 Deployment, 1 Job, 2 Pod (the two t
 **Predict before running this:** which pods does the `web` Service select?
 
 ```bash
-grep -B1 -A3 "selector:" /tmp/shop.yaml | grep -E "app|name:"
+grep -B1 -A3 "selector:" $LAB_TMP/shop.yaml | grep -E "app|name:"
 ```
 
 Only `app: s` (the web pods) appears under the web Service; `api` and `db` select on `app.kubernetes.io/name` and
@@ -1066,7 +1073,7 @@ Update `.github/workflows/chart-ci.yaml`: replace the dependency and unit-test s
 
       - name: Unit tests
         run: |
-          helm plugin install https://github.com/helm-unittest/helm-unittest
+          helm plugin install https://github.com/helm-unittest/helm-unittest --version v1.1.2
           helm unittest charts/nginx-demo charts/shop
 ```
 
@@ -1087,23 +1094,24 @@ ct install --config ct.yaml --charts charts/shop
 Set up the throwaway GnuPG signing key (or reuse the one from Lab 12 if still in your session):
 
 ```bash
-if [ -z "$GNUPGHOME" ] || [ ! -f "$GNUPGHOME/secring.gpg" ]; then
+if [ -z "$GNUPGHOME" ] || [ ! -f "$GNUPGHOME/helm-keys/secring.gpg" ]; then
   export GNUPGHOME=$(mktemp -d); chmod 700 "$GNUPGHOME"
   gpg --batch --pinentry-mode loopback --passphrase '' \
     --quick-generate-key "Helm Lab <helm-lab@example.com>" rsa3072 default 1y
-  gpg --export > "$GNUPGHOME/pubring.gpg"
-  gpg --batch --pinentry-mode loopback --passphrase '' --export-secret-keys > "$GNUPGHOME/secring.gpg"
+  mkdir -p "$GNUPGHOME/helm-keys"   # outside the GnuPG home root, so gpg does not try to "migrate" them
+gpg --export > "$GNUPGHOME/helm-keys/pubring.gpg"
+  gpg --batch --pinentry-mode loopback --passphrase '' --export-secret-keys > "$GNUPGHOME/helm-keys/secring.gpg"
 fi
 
-mkdir -p /tmp/shop-pkg
-helm package charts/shop --sign --key "Helm Lab" --keyring "$GNUPGHOME/secring.gpg" -d /tmp/shop-pkg
-tar tzf /tmp/shop-pkg/shop-0.1.0.tgz | grep -E "secrets\.|\.sops|shop/tests/|shop/ci/"   # no output
+mkdir -p $LAB_TMP/shop-pkg
+helm package charts/shop --sign --key "Helm Lab" --keyring "$GNUPGHOME/helm-keys/secring.gpg" -d $LAB_TMP/shop-pkg
+tar tzf $LAB_TMP/shop-pkg/shop-0.1.0.tgz | grep -E "secrets\.|\.sops|shop/tests/|shop/ci/"   # no output
 docker start helm-registry 2>/dev/null || docker run -d -p 5001:5000 --name helm-registry registry:2
-helm push /tmp/shop-pkg/shop-0.1.0.tgz oci://localhost:5001/helm-lab
+helm push $LAB_TMP/shop-pkg/shop-0.1.0.tgz oci://localhost:5001/helm-lab
 
-mkdir -p /tmp/shop-pull
-helm pull oci://localhost:5001/helm-lab/shop --version 0.1.0 --verify --keyring "$GNUPGHOME/pubring.gpg" -d /tmp/shop-pull
-helm secrets install shop-oci /tmp/shop-pull/shop-0.1.0.tgz -n helm-lab --verify --keyring "$GNUPGHOME/pubring.gpg" \
+mkdir -p $LAB_TMP/shop-pull
+helm pull oci://localhost:5001/helm-lab/shop --version 0.1.0 --verify --keyring "$GNUPGHOME/helm-keys/pubring.gpg" -d $LAB_TMP/shop-pull
+helm secrets install shop-oci $LAB_TMP/shop-pull/shop-0.1.0.tgz -n helm-lab --verify --keyring "$GNUPGHOME/helm-keys/pubring.gpg" \
   -f ./charts/shop/values-dev.yaml -f ./charts/shop/secrets.dev.yaml --wait --timeout 240s
 helm test shop-oci -n helm-lab --timeout 90s
 ```
@@ -1233,12 +1241,13 @@ kubectl delete pvc -n helm-lab -l app.kubernetes.io/instance=shop-prod       # S
 kubectl delete pod,job -n helm-lab -l 'app.kubernetes.io/instance in (shop-dev,shop-prod,shop-oci)'
 kubectl get pvc,pods,job -n helm-lab | grep -i shop                          # nothing should remain
 docker rm -f helm-registry 2>/dev/null || true
-rm -rf /tmp/shop-pkg /tmp/shop-pull /tmp/shop.yaml "$GNUPGHOME"
+rm -rf "$LAB_TMP" "$GNUPGHOME"
 unset GNUPGHOME
 ```
 
 Keep `~/.config/sops/age/keys.txt`. You may commit `charts/shop/secrets.*.yaml` and `.sops.yaml` (encrypted); never commit the private key.
-Tick Lab 13 in the README and create `lab-13-complete`.
+Create a personal tag such as `my-lab-13-complete` (the reference
+`lab-13-complete` tag already exists in this repository).
 
 References: [PostgREST](https://postgrest.org/en/v12/), [Helm subcharts and globals](https://helm.sh/docs/chart_template_guide/subcharts_and_globals/),
 [Chart hooks](https://helm.sh/docs/topics/charts_hooks/), [StatefulSet storage](https://kubernetes.io/docs/concepts/workloads/controllers/statefulset/#volume-claim-templates).

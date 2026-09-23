@@ -118,8 +118,8 @@ and observe the YAML parse error with `helm template --debug`.
 
 ## Cleanup and checkpoint
 
-Keep the successful dev configuration and release. Commit and create
-`lab-04-complete`.
+Keep the successful dev configuration and release. Commit and create a personal tag such as `my-lab-04-complete` (the reference
+`lab-04-complete` tag already exists in this repository).
 
 <details>
 <summary>Reference: complete containers block in `templates/deployment.yaml`</summary>

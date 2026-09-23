@@ -365,8 +365,8 @@ Try answering before opening the answers:
 
 ## Finish
 
-Save your working changes and observations. Commit your work, and create
-`lab-05-complete` if that checkpoint does not already exist. Keep `demo-dev`
+Save your working changes and observations. Commit your work, and create a personal tag such as `my-lab-05-complete` (the reference
+`lab-05-complete` tag already exists in this repository). Keep `demo-dev`
 installed for Lab 6.
 
 Optional reading: [Helm named templates](https://helm.sh/docs/v3/chart_template_guide/named_templates/)
