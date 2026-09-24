@@ -1,6 +1,6 @@
 # Lab 0: Chart creation
 
-**Start:** Your practice branch from the [README's "Start here"](../README.md#start-here), or an empty directory. *Do not run `helm create` directly on `main`*, as that would overwrite the reference chart. The practice branch already contains this lab's result (tag `lab-00-start`), so Step 1 prints `WARNING: File ... already exists. Overwriting.` for a few files; that is expected, and Steps 3–6 replace them.
+**Start:** Your practice branch from the [README's "Start here"](../README.md#start-here). *Do not run `helm create` directly on `main`*, as that would overwrite the reference chart.
 **Goal:** Scaffold a chart using `helm create`, examine the generated structure, strip unnecessary boilerplate, and craft a minimal working starter chart.
 
 ---
@@ -17,12 +17,19 @@ In real-world engineering, teams often run `helm create` and then **strip the te
 
 ### 1. Scaffold the initial chart
 
-From your repository or practice directory root, run:
+Your practice branch already contains the finished result of this lab (saved in the tag `lab-00-start`).
+To build it yourself, remove it first so you start from an empty folder. From the repository root, run:
 
 ```bash
-mkdir -p charts
+rm -rf charts/nginx-demo
 helm create charts/nginx-demo
 ```
+
+*Expect:* `Creating charts/nginx-demo`.
+
+> [!WARNING]
+> Type the path without a trailing slash. `helm create charts/nginx-demo/` creates the chart one level
+> deeper, in `charts/nginx-demo/nginx-demo/`. If that happens, run the two commands above again.
 
 ### 2. Inspect the generated structure
 
@@ -159,6 +166,9 @@ Expect:
 
 - `1 chart(s) linted, 0 chart(s) failed` (the `[INFO] Chart.yaml: icon is recommended` note is expected and harmless)
 - Rendered Kubernetes YAML containing `demo-dev-deployment` (replicas: 2) and `demo-dev-service`.
+
+Optionally, compare your chart with the reference: `git diff lab-00-start -- charts`. The reference also has
+explanatory comments, an `icon` line, and a `README.md`, so differences in those are expected.
 
 ---
 
