@@ -276,8 +276,16 @@ git commit -m "Start from the lab-00-start chart"
 When you are done:
 
 ```bash
+git add -A && git commit -m "My progress"   # in the practice folder; remove refuses uncommitted work
 cd ../helm-lab   # back to this repository
 git worktree remove ../helm-lab-practice
+```
+
+Removing the folder keeps your `my-practice` branch and its commits. To pick up where you left off, recreate
+the folder from that branch (without `-b`, which would fail because the branch already exists):
+
+```bash
+git worktree add ../helm-lab-practice my-practice
 ```
 
 #### Approach 4: Inspect solutions without editing code
