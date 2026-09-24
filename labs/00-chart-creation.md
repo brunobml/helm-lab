@@ -1,6 +1,6 @@
 # Lab 0: Chart creation
 
-**Start:** An empty directory, a practice branch (`git switch -c my-lab-00 lab-00-start`), or a clean worktree (`git worktree add ../helm-lab-practice lab-00-start`). *Do not run `helm create` directly on `main`*, as that would overwrite the reference chart. The `lab-00-start` tag already contains this lab's result, so when you start from it, Step 1 prints `WARNING: File ... already exists. Overwriting.` for a few files; that is expected, and Steps 3–6 replace them.
+**Start:** Your practice branch from the [README's "Start here"](../README.md#start-here), or an empty directory. *Do not run `helm create` directly on `main`*, as that would overwrite the reference chart. The practice branch already contains this lab's result (tag `lab-00-start`), so Step 1 prints `WARNING: File ... already exists. Overwriting.` for a few files; that is expected, and Steps 3–6 replace them.
 **Goal:** Scaffold a chart using `helm create`, examine the generated structure, strip unnecessary boilerplate, and craft a minimal working starter chart.
 
 ---
@@ -56,7 +56,7 @@ rm -rf charts/nginx-demo/templates/*
 Keep `.helmignore` and the `charts/` folder intact.
 
 > [!NOTE]
-> **Do not commit yet.** At this stage, `templates/` is empty while `values.yaml` and `Chart.yaml` still contain unused boilerplate. You will create your milestone commit (`lab-00-start`) at the end of the lab after completing Steps 4–6 and verifying the chart with `helm lint`.
+> **Do not commit yet.** At this stage, `templates/` is empty while `values.yaml` and `Chart.yaml` still contain unused boilerplate. You will create your milestone commit at the end of the lab after completing Steps 4–6 and verifying the chart with `helm lint`.
 
 ### 4. Configure `Chart.yaml`
 
@@ -204,7 +204,7 @@ If you are tracking your own progress in git, stage and commit your starter char
 ```bash
 git add charts/nginx-demo
 git commit -m "Complete lab 0: scaffold starter chart"
-git tag lab-00-start
+git tag my-lab-00-complete   # personal tag; lab-00-start is the repository's reference
 ```
 
 Next: Continue to [Lab 1: First chart](01-first-chart.md) to install and run this application on your cluster.

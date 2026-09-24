@@ -21,7 +21,7 @@ The `main` branch contains the fully completed, hardened reference code (from La
 ```text
 charts/nginx-demo/   Your evolving chart
 labs/               Ordered exercises, hints, and completion checks
-labs/extensions/    Optional Kubernetes-focused exercises
+labs/extensions/    Kubernetes-focused exercises (do them before Lab 10)
 ```
 
 ## Before you start
@@ -62,7 +62,7 @@ These instructions use Helm 3 semantics.
 2. **Create a disposable local cluster** (pick one):
 
    ```bash
-   # With kind:
+   # With kind (if a cluster with this name already exists, reuse it or `kind delete cluster --name helm-lab` first):
    kind create cluster --name helm-lab --wait 120s
    kubectl config use-context kind-helm-lab
 
@@ -75,11 +75,21 @@ These instructions use Helm 3 semantics.
    ```
 
 3. **Create your practice branch.** `main` holds the finished reference solution, so do your own work
-   on a branch that starts from the minimal scaffold:
+   on a branch that keeps the current lab instructions but puts the chart back to the minimal scaffold:
 
    ```bash
-   git switch -c my-learning lab-00-start
+   git switch -c my-learning main
+   git restore --source=lab-00-start --staged --worktree -- charts ct ct.yaml helmfile .github/workflows/chart-ci.yaml
+   git commit -m "Start from the lab-00-start chart"
    ```
+
+   The commit lists many `delete mode` lines; that's expected, since it removes the finished solution.
+   `ls charts` now shows only `nginx-demo`. The later charts and CI files come back as you build them.
+
+   > [!IMPORTANT]
+   > Don't branch directly from a tag (`git switch -c my-learning lab-00-start`). A tag saves the whole
+   > repository, including the lab instructions as they were back then, so you would get outdated labs
+   > and no Labs 0 or 10–18.
 
 4. **Start with [Lab 0](labs/00-chart-creation.md)** (build the starter chart yourself), or go straight
    to [Lab 1](labs/01-first-chart.md) (the branch already contains Lab 0's result).
@@ -156,6 +166,8 @@ Each lab also links an `-explained.md` page with the reasoning behind every step
 ## Checkpoints and how to use this repository
 
 This repository includes prebuilt, cluster-verified reference tags for every milestone in the learning path.
+Use them for their **charts** (compare or restore with `-- charts`). The lab instructions saved in a tag are
+older than the ones on `main`, so always read the labs from `main` or your practice branch.
 
 ### Available tags
 
@@ -197,13 +209,9 @@ You can approach the exercises using any of these workflows:
 
 Work inside this repository without modifying `main` or losing reference solutions:
 
-1. **Start from the clean scaffold:**
+1. **Start from the clean scaffold** with the branch from [Start here, step 3](#start-here).
 
-   ```bash
-   git checkout -b my-learning lab-00-start
-   ```
-
-2. Follow the lab instructions in `labs/01-first-chart.md` through `labs/18-helm-internals-and-advanced-operations.md`.
+2. Follow the labs in order, from `labs/00-chart-creation.md` to `labs/18-helm-internals-and-advanced-operations.md`.
 3. Test commands against your cluster and commit your progress as you complete each lab:
 
    ```bash
@@ -213,38 +221,39 @@ Work inside this repository without modifying `main` or losing reference solutio
 4. **Compare against the reference solution at any time:**
 
    ```bash
-   # See how your code compares to the official solution:
-   git diff lab-01-complete
+   # See how your chart compares to the official solution:
+   git diff lab-01-complete -- charts
    ```
 
-5. **Return to the fully completed reference anytime:**
+5. **Look at the fully completed reference anytime** (commit your work first, then come back):
 
    ```bash
-   git checkout main
+   git switch main
+   git switch my-learning
    ```
 
 #### Approach 2: Jump directly into a specific lab
 
 Want to practice a specific topic (e.g., Lab 4: Template Logic or Lab 6: ConfigMaps) without completing prior labs?
 
-1. Check out the prerequisite checkpoint into a new branch:
+1. Create a branch from `main` and restore the charts from the prerequisite checkpoint (same pattern as
+   [Start here, step 3](#start-here), with a different tag):
 
    ```bash
    # To start Lab 4, start from Lab 3's completion:
-   git checkout -b practice-lab-04 lab-03-complete
-
-   # To start Lab 6, start from Lab 5's completion:
-   git checkout -b practice-lab-06 lab-05-complete
-
-   # To start Lab 10, start after the four extensions:
-   git checkout -b practice-lab-10 extension-storage-complete
+   git switch -c practice-lab-04 main
+   git restore --source=lab-03-complete --staged --worktree -- charts ct ct.yaml helmfile .github/workflows/chart-ci.yaml
+   git commit -m "Start Lab 4 from lab-03-complete"
    ```
+
+   For Lab 6 use `lab-05-complete`; for Lab 10 use `extension-storage-complete` (the state after the
+   four extensions). In general, start Lab NN from the tag of the lab before it.
 
 2. Follow the lab guide, make your changes, and test.
 3. Compare your result with the completion checkpoint:
 
    ```bash
-   git diff lab-04-complete
+   git diff lab-04-complete -- charts
    ```
 
 > [!NOTE]
@@ -255,9 +264,11 @@ Want to practice a specific topic (e.g., Lab 4: Template Logic or Lab 6: ConfigM
 If you want to keep this repo as your read-only manual while coding in an independent directory:
 
 ```bash
-# Create an isolated practice workspace pointing to the starting tag:
-git worktree add ../helm-lab-practice lab-00-start
+# Create an isolated practice workspace with its own branch, then reset its charts to the scaffold:
+git worktree add ../helm-lab-practice -b my-practice main
 cd ../helm-lab-practice
+git restore --source=lab-00-start --staged --worktree -- charts ct ct.yaml helmfile .github/workflows/chart-ci.yaml
+git commit -m "Start from the lab-00-start chart"
 
 # Work through labs, run cluster tests, and commit freely in this folder!
 ```
