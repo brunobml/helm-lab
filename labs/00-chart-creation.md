@@ -40,6 +40,34 @@ ls -la charts/nginx-demo
 ls -la charts/nginx-demo/templates
 ```
 
+Or, if you have the `tree` command (`sudo apt install tree` on Debian/Ubuntu/WSL, `brew install tree` on macOS),
+see the whole structure at once. `-a` also shows hidden files such as `.helmignore`:
+
+```bash
+tree -a charts/nginx-demo
+```
+
+```text
+charts/nginx-demo
+├── .helmignore
+├── Chart.yaml
+├── charts
+├── templates
+│   ├── NOTES.txt
+│   ├── _helpers.tpl
+│   ├── deployment.yaml
+│   ├── hpa.yaml
+│   ├── httproute.yaml
+│   ├── ingress.yaml
+│   ├── service.yaml
+│   ├── serviceaccount.yaml
+│   └── tests
+│       └── test-connection.yaml
+└── values.yaml
+
+4 directories, 12 files
+```
+
 Notice what Helm created:
 
 - **`Chart.yaml`**: The chart's primary metadata (name, version, description).
